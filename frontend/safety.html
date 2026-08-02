@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Safety Center — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<nav class="navbar navbar-rc">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="img/logo.png" alt="Gwin's Readers Club" class="navbar-logo-img">Gwin's Readers Club</a>
+  </div>
+</nav>
+
+<div class="container py-5" style="max-width: 760px;">
+  <div class="text-center mb-4">
+    <span class="safety-badge">🛟 Safety Center</span>
+    <h3 class="fw-bold mt-2">Keeping Gwin's Readers Club a safe place to grow</h3>
+    <p class="text-muted">This platform is built for children and young readers. Here's how we protect members, and how to reach us if something feels wrong.</p>
+  </div>
+
+  <div class="card card-rc p-4 mb-3">
+    <h6>What we do to keep members safe</h6>
+    <ul class="small mb-0">
+      <li>Every account under 18 requires a parent or guardian's name, email, and explicit consent before it's created.</li>
+      <li>Staff (admins, moderators, mentors) are verified adults; members choose an illustrated avatar rather than uploading a real photo of themselves.</li>
+      <li>All community posts, reviews, and messages can be reported and are reviewed by our moderation team.</li>
+      <li>Sessions automatically sign out after 20 minutes of inactivity, protecting accounts on shared or school devices.</li>
+      <li>We collect the minimum information needed to run the platform — see our <a href="privacy-policy.html">Privacy &amp; Child Safety Policy</a>.</li>
+    </ul>
+  </div>
+
+  <div class="card card-rc p-4 mb-3 border-danger">
+    <h6 class="text-danger">In an emergency</h6>
+    <p class="small mb-1">If a child is in immediate danger, contact local emergency services right away.</p>
+    <p class="small mb-0">In Nigeria: <strong>NAPTIP</strong> (human trafficking &amp; abuse) toll-free line <strong>0800-CALL-NAPTIP (0800-2255-62784)</strong>, or the Nigeria Police Force emergency number <strong>112</strong>.</p>
+  </div>
+
+  <div class="card card-rc p-4">
+    <h6>Report a concern</h6>
+    <p class="text-muted small">Use this form for anything that worries you — inappropriate behavior from another member or a mentor, a concerning message, or anything else. You don't need to be logged in to use it, and reports go straight to our moderation team.</p>
+    <div id="report-alert"></div>
+    <div class="mb-2">
+      <label class="form-label small">Your Email (optional, in case we need to follow up)</label>
+      <input type="email" class="form-control" id="reporter_email">
+    </div>
+    <div class="mb-3">
+      <label class="form-label small">What happened?</label>
+      <textarea class="form-control" id="concern" rows="4" placeholder="Please share as much detail as you're comfortable with."></textarea>
+    </div>
+    <button class="btn btn-rc" style="width:fit-content;" onclick="submitConcern()">Submit Report</button>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+async function submitConcern() {
+  const concern = document.getElementById("concern").value.trim();
+  const email = document.getElementById("reporter_email").value.trim();
+  if (!concern) {
+    showAlert("report-alert", "Please describe the concern before submitting.");
+    return;
+  }
+  const reason = email ? `${concern}\n\n(Reporter email: ${email})` : concern;
+
+  if (getToken()) {
+    // Logged-in members can file this straight through the reports API.
+    try {
+      await api("/reports", {
+        method: "POST",
+        body: JSON.stringify({ content_type: "safety_concern", reason }),
+      });
+      showAlert("report-alert", "Thank you — your report has been sent to our moderation team.", "success");
+      document.getElementById("concern").value = "";
+    } catch (err) {
+      showAlert("report-alert", err.message);
+    }
+  } else {
+    try {
+      const res = await fetch("/api/reports/safety-concern", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: concern, reporter_email: email || null }),
+      });
+      if (!res.ok) throw new Error("Something went wrong. Please try again.");
+      showAlert("report-alert", "Thank you — your report has been sent to our team.", "success");
+      document.getElementById("concern").value = "";
+    } catch (err) {
+      showAlert("report-alert", err.message);
+    }
+  }
+}
+</script>
+</body>
+</html>

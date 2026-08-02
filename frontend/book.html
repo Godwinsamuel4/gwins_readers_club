@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Book Details — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div id="book-detail">Loading...</div>
+  <div id="reaction-bar" class="d-flex gap-2 mb-3"></div>
+
+  <div class="card card-rc p-3 mt-4">
+    <div class="d-flex justify-content-between align-items-center">
+      <h5>Reviews</h5>
+      <button class="btn btn-sm btn-rc" data-bs-toggle="modal" data-bs-target="#reviewModal">Write a Review</button>
+    </div>
+    <div id="reviews-list" class="mt-3">Loading...</div>
+  </div>
+</div>
+
+<!-- Review Modal -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Write a Review</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="review-alert"></div>
+        <div class="mb-2">
+          <label class="form-label">Rating</label>
+          <select class="form-select" id="r_rating">
+            <option value="5">★★★★★ Excellent</option>
+            <option value="4">★★★★☆ Good</option>
+            <option value="3">★★★☆☆ Okay</option>
+            <option value="2">★★☆☆☆ Poor</option>
+            <option value="1">★☆☆☆☆ Not for me</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Your Review</label>
+          <textarea class="form-control" id="r_text" rows="3"></textarea>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Lessons Learned (optional)</label>
+          <textarea class="form-control" id="r_lessons" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitReview()">Submit Review</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script src="js/engage.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("library");
+const params = new URLSearchParams(window.location.search);
+const bookId = params.get("id");
+
+function starString(rating) {
+  if (!rating) return `<span class="text-muted small">No ratings yet</span>`;
+  const full = Math.round(rating);
+  return `<span class="rating-stars">${"★".repeat(full)}${"☆".repeat(5-full)}</span> <span class="small text-muted">(${rating} avg)</span>`;
+}
+
+async function loadBook() {
+  const b = await api(`/library/books/${bookId}`);
+  document.getElementById("book-detail").innerHTML = `
+    <div class="card card-rc p-4">
+      <div class="row">
+        <div class="col-md-3">
+          ${bookCoverHtml(b, "height:260px; font-size:1rem;")}
+        </div>
+        <div class="col-md-9">
+          <div class="category-pill mb-2">${b.category}</div>
+          <h3>${b.title}</h3>
+          <div class="text-muted mb-2">by ${b.author} ${b.publisher ? "· " + b.publisher : ""} ${b.publication_year ? "· " + b.publication_year : ""}</div>
+          <div class="mb-2">${starString(b.average_rating)} <span class="text-muted small">(${b.review_count} reviews)</span></div>
+          <p>${b.description || ""}</p>
+          <div class="text-muted small mb-3">${b.number_of_pages} pages · ~${b.reading_time_minutes} min read · ${b.language} · ${b.view_count} views</div>
+          <a href="reader.html?id=${b.id}" class="btn btn-rc-gold me-2">Start Reading</a>
+          <button class="btn btn-outline-secondary" id="fav-btn" onclick="toggleFavorite()">♡ Add to Favorites</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function toggleFavorite() {
+  const r = await api(`/library/favorites/${bookId}`, { method: "POST" });
+  document.getElementById("fav-btn").textContent = r.favorited ? "♥ Favorited" : "♡ Add to Favorites";
+}
+
+// #20 Quick-reaction bar — lightweight, shared reactions visible to every club member
+const REACTIONS = ["🔥", "📖", "❤️"];
+async function loadReactions() {
+  const r = await api(`/library/books/${bookId}/reactions`);
+  document.getElementById("reaction-bar").innerHTML = REACTIONS.map(e => `
+    <button class="btn btn-sm ${r.my_reaction === e ? "btn-rc" : "btn-outline-secondary"}" onclick="toggleReaction('${e}')">
+      ${e} ${r.counts[e] || 0}
+    </button>
+  `).join("");
+}
+async function toggleReaction(emoji) {
+  await api(`/library/books/${bookId}/reactions`, { method: "POST", body: JSON.stringify({ emoji }) });
+  loadReactions();
+}
+
+async function loadReviews() {
+  const reviews = await api(`/community/reviews/${bookId}`);
+  const el = document.getElementById("reviews-list");
+  if (!reviews.length) {
+    el.innerHTML = `<p class="text-muted small">No reviews yet — be the first to share your thoughts.</p>`;
+    return;
+  }
+  el.innerHTML = reviews.map(r => `
+    <div class="border-bottom pb-2 mb-2">
+      <div class="d-flex justify-content-between">
+        <strong>${escapeHtml(r.reviewer_name)}</strong>
+        <span class="text-muted small">${timeAgo(r.created_at)}</span>
+      </div>
+      <div class="rating-stars small">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</div>
+      <p class="mb-1">${escapeHtml(r.review_text)}</p>
+      ${r.lessons_learned ? `<p class="small text-muted fst-italic mb-0">Lesson: ${escapeHtml(r.lessons_learned)}</p>` : ""}
+      <div class="mt-1">
+        <button class="btn btn-sm ${r.marked_helpful_by_me ? "btn-rc" : "btn-outline-secondary"}" onclick="toggleHelpful(${r.id})">
+          👍 Helpful (${r.helpful_count})
+        </button>
+        <button class="btn btn-sm btn-link text-muted p-0 ms-2" style="font-size:0.75rem;" onclick="toggleComments(${r.id})">
+          💬 Comments (${r.comment_count})
+        </button>
+        <button class="btn btn-sm btn-link text-muted p-0 ms-2" style="font-size:0.75rem;" onclick="reportContent('review', ${r.id})">Report</button>
+      </div>
+      <div id="comments-${r.id}" class="d-none mt-2 ps-3 border-start"></div>
+    </div>
+  `).join("");
+}
+
+async function toggleHelpful(reviewId) {
+  await api(`/community/reviews/${reviewId}/helpful`, { method: "POST" });
+  loadReviews();
+}
+
+async function toggleComments(reviewId) {
+  const box = document.getElementById(`comments-${reviewId}`);
+  if (!box.classList.contains("d-none")) { box.classList.add("d-none"); return; }
+  box.classList.remove("d-none");
+  box.innerHTML = "Loading...";
+  const comments = await api(`/community/reviews/${reviewId}/comments`);
+  const currentUser = getUser();
+  box.innerHTML = `
+    ${comments.map(c => `
+      <div class="d-flex justify-content-between small mb-1">
+        <div><strong>${escapeHtml(c.commenter_name)}</strong> ${escapeHtml(c.content)} <span class="text-muted">· ${timeAgo(c.created_at)}</span></div>
+        ${(c.user_id === currentUser.id || currentUser.role === "admin" || currentUser.role === "moderator")
+          ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="deleteComment(${reviewId}, ${c.id})">✕</button>` : ""}
+      </div>
+    `).join("") || `<p class="text-muted small">No comments yet.</p>`}
+    <div class="input-group input-group-sm mt-1">
+      <input type="text" class="form-control" id="comment-input-${reviewId}" placeholder="Add a comment...">
+      <button class="btn btn-outline-secondary" onclick="addComment(${reviewId})">Post</button>
+    </div>
+  `;
+}
+
+async function addComment(reviewId) {
+  const input = document.getElementById(`comment-input-${reviewId}`);
+  const content = input.value.trim();
+  if (!content) return;
+  await api(`/community/reviews/${reviewId}/comments`, { method: "POST", body: JSON.stringify({ content }) });
+  await loadReviews();
+  toggleComments(reviewId);
+}
+
+async function deleteComment(reviewId, commentId) {
+  if (!confirm("Delete this comment?")) return;
+  await api(`/community/reviews/comments/${commentId}`, { method: "DELETE" });
+  await loadReviews();
+  toggleComments(reviewId);
+}
+
+async function reportContent(contentType, contentId) {
+  const reason = prompt("Why are you reporting this content?");
+  if (!reason) return;
+  try {
+    await api("/reports", { method: "POST", body: JSON.stringify({ content_type: contentType, content_id: contentId, reason }) });
+    alert("Thanks — this has been flagged for moderator review.");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function submitReview() {
+  const payload = {
+    book_id: parseInt(bookId),
+    rating: parseInt(document.getElementById("r_rating").value),
+    review_text: document.getElementById("r_text").value,
+    lessons_learned: document.getElementById("r_lessons").value || null,
+  };
+  try {
+    await api("/community/reviews", { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("reviewModal")).hide();
+    if (typeof Engage !== "undefined") Engage.save("reviews_written", Engage.load("reviews_written", 0) + 1);
+    loadReviews();
+    loadBook();
+  } catch (err) {
+    showAlert("review-alert", err.message);
+  }
+}
+
+loadBook();
+loadReviews();
+loadReactions();
+</script>
+</body>
+</html>

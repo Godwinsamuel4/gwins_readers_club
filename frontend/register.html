@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Join — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<nav class="navbar navbar-rc">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="img/logo.png" alt="Gwin's Readers Club" class="navbar-logo-img">Gwin's Readers Club</a>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 520px; margin-top: 40px; margin-bottom: 40px;">
+  <div class="card card-rc p-4">
+    <h4 class="mb-3 text-center">Join the Club</h4>
+    <div id="alert-box"></div>
+    <form id="register-form">
+      <div class="mb-3">
+        <label class="form-label">Full Name</label>
+        <input type="text" class="form-control" id="full_name" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-control" id="password" minlength="6" required>
+      </div>
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          <label class="form-label">School / Organization</label>
+          <input type="text" class="form-control" id="school">
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label">State</label>
+          <input type="text" class="form-control" id="state">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Reading Interests (comma-separated)</label>
+        <input type="text" class="form-control" id="reading_interests" placeholder="e.g. African Literature, Business, Christian">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Age Range</label>
+        <select class="form-select" id="age_bracket" required>
+          <option value="" selected disabled>Select your age range</option>
+          <option value="Under 13">Under 13</option>
+          <option value="13-15">13 – 15</option>
+          <option value="16-17">16 – 17</option>
+          <option value="18+">18 or older</option>
+        </select>
+        <div class="form-text">We ask this so we can put the right safeguards in place for younger members.</div>
+      </div>
+
+      <div id="guardian-section" class="d-none">
+        <div class="alert alert-info small">
+          Because you're under 18, we need a parent or guardian's permission before your account can be created.
+        </div>
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Parent/Guardian Full Name</label>
+            <input type="text" class="form-control" id="guardian_name">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Parent/Guardian Email</label>
+            <input type="email" class="form-control" id="guardian_email">
+          </div>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" id="guardian_consent">
+          <label class="form-check-label small" for="guardian_consent">
+            I confirm I am this child's parent or guardian and I give permission for them to join Gwin's Readers Club.
+          </label>
+        </div>
+      </div>
+
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="accepted_terms" required>
+        <label class="form-check-label small" for="accepted_terms">
+          I have read and agree to the <a href="privacy-policy.html" target="_blank">Privacy &amp; Child Safety Policy</a>.
+        </label>
+      </div>
+
+      <button type="submit" class="btn btn-rc w-100">Create Account</button>
+    </form>
+    <p class="text-center mt-3 mb-0 small">Already a member? <a href="login.html">Log in</a></p>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+const MINOR_BRACKETS = ["Under 13", "13-15", "16-17"];
+document.getElementById("age_bracket").addEventListener("change", (e) => {
+  const isMinor = MINOR_BRACKETS.includes(e.target.value);
+  document.getElementById("guardian-section").classList.toggle("d-none", !isMinor);
+});
+
+document.getElementById("register-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const age_bracket = document.getElementById("age_bracket").value;
+  const isMinor = MINOR_BRACKETS.includes(age_bracket);
+  const guardian_consent = document.getElementById("guardian_consent").checked;
+  if (isMinor && !guardian_consent) {
+    showAlert("alert-box", "A parent or guardian must confirm consent before this account can be created.");
+    return;
+  }
+  const payload = {
+    full_name: document.getElementById("full_name").value.trim(),
+    email: document.getElementById("email").value.trim(),
+    password: document.getElementById("password").value,
+    school: document.getElementById("school").value.trim() || null,
+    state: document.getElementById("state").value.trim() || null,
+    reading_interests: document.getElementById("reading_interests").value.trim() || null,
+    age_bracket,
+    guardian_name: isMinor ? document.getElementById("guardian_name").value.trim() : null,
+    guardian_email: isMinor ? document.getElementById("guardian_email").value.trim() : null,
+    guardian_consent: isMinor ? guardian_consent : false,
+    accepted_terms: document.getElementById("accepted_terms").checked,
+  };
+  try {
+    const data = await api("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setSession(data.access_token, data.user);
+    window.location.href = "dashboard.html";
+  } catch (err) {
+    showAlert("alert-box", err.message);
+  }
+});
+</script>
+</body>
+</html>

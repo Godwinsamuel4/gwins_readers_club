@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#35538F">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 id="greeting" class="mb-2"></h3>
+  <div id="engage-quote-banner-container" class="mb-3"></div>
+  <div id="engage-onboarding" class="mb-3"></div>
+
+  <div class="row g-4">
+    <div class="col-md-3">
+      <div class="card card-rc p-3 text-center">
+        <div class="streak-badge" id="streak-num">0</div>
+        <div class="mt-2 fw-bold">Day Streak</div>
+        <div class="text-muted small" id="longest-streak"></div>
+        <div class="mt-2" id="engage-streak-freeze"></div>
+      </div>
+    </div>
+    <div class="col-md-9">
+      <div class="card card-rc p-3">
+        <div class="row text-center">
+          <div class="col-4">
+            <h4 id="books-completed">0</h4>
+            <small class="text-muted">Books Completed</small>
+          </div>
+          <div class="col-4">
+            <h4 id="books-reading">0</h4>
+            <small class="text-muted">Currently Reading</small>
+          </div>
+          <div class="col-4">
+            <h4 id="pages-read">0</h4>
+            <small class="text-muted">Pages Read</small>
+          </div>
+        </div>
+        <hr>
+        <div id="engage-xp" class="mb-2"></div>
+        <div class="small text-muted mb-1">🏅 Badges</div>
+        <div id="engage-badges"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-4 g-4">
+    <div class="col-12">
+      <div id="engage-weekly-challenge"></div>
+    </div>
+  </div>
+
+  <div class="row mt-4 g-4">
+    <div class="col-md-7">
+      <div class="card card-rc p-3">
+        <h5>📖 Book of the Month <span id="botm-month" class="text-muted small"></span></h5>
+        <div id="botm-content">Loading...</div>
+      </div>
+
+      <div class="card card-rc p-3 mt-4">
+        <h5>Continue Reading</h5>
+        <div id="continue-reading" class="row g-3 mt-1">Loading...</div>
+      </div>
+    </div>
+
+    <div class="col-md-5">
+      <div class="card card-rc p-3">
+        <h5>🎯 Reading Goals</h5>
+        <div id="goals-list">Loading...</div>
+        <button class="btn btn-sm btn-rc mt-2" data-bs-toggle="modal" data-bs-target="#goalModal">+ Set a Goal</button>
+      </div>
+
+      <div class="card card-rc p-3 mt-4">
+        <h5>Recommended for You</h5>
+        <div id="recommended-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Goal Modal -->
+<div class="modal fade" id="goalModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Set a Reading Goal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Goal Type</label>
+          <select class="form-select" id="goal_type">
+            <option value="monthly">Monthly</option>
+            <option value="annual">Annual</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Target number of books</label>
+          <input type="number" min="1" class="form-control" id="target_books" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="createGoal()">Save Goal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script src="js/engage.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("dashboard");
+const user = getUser();
+document.getElementById("greeting").textContent = `Welcome back, ${user.full_name.split(" ")[0]}! 👋`;
+Engage.showQuoteBanner("engage-quote-banner-container");
+Engage.renderWeeklyChallenge("engage-weekly-challenge");
+Engage.ensureMascot();
+
+async function loadSummary() {
+  const s = await api("/progress/summary");
+  document.getElementById("streak-num").textContent = s.current_streak;
+  document.getElementById("longest-streak").textContent = `Longest: ${s.longest_streak} days`;
+  document.getElementById("books-completed").textContent = s.books_completed;
+  document.getElementById("books-reading").textContent = s.books_in_progress;
+  document.getElementById("pages-read").textContent = s.pages_read;
+
+  Engage.renderStreakFreeze("engage-streak-freeze");
+  const reviewsWritten = Engage.load("reviews_written", 0);
+  const stats = {
+    booksCompleted: s.books_completed, streak: s.current_streak,
+    pagesRead: s.pages_read, reviews: reviewsWritten,
+  };
+  Engage.renderXp("engage-xp", stats);
+  Engage.checkBadges(stats);
+  Engage.renderBadgeShelf("engage-badges");
+  if (s.current_streak >= 3) Engage.mascotSay(`🔥 ${s.current_streak}-day streak — keep it up!`);
+}
+
+// #18 Onboarding checklist for new members — auto-dismisses once every step is done
+async function renderOnboarding() {
+  const [goals, favorites, clubs] = await Promise.all([
+    api("/progress/goals").catch(() => []),
+    api("/library/favorites").catch(() => []),
+    api("/clubs").catch(() => []),
+  ]);
+  const reviewsWritten = Engage.load("reviews_written", 0);
+  const steps = [
+    { label: "Set a reading goal", done: goals.length > 0 },
+    { label: "Favorite a book", done: favorites.length > 0 },
+    { label: "Write your first review", done: reviewsWritten > 0 },
+    { label: "Join a reading club", done: clubs.some(c => c.is_member) },
+  ];
+  if (steps.every(s => s.done) && Engage.load("onboarding_dismissed", false)) {
+    document.getElementById("engage-onboarding").innerHTML = "";
+    return;
+  }
+  if (steps.every(s => s.done)) Engage.save("onboarding_dismissed", true);
+  document.getElementById("engage-onboarding").innerHTML = `
+    <div class="card card-rc p-3">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <h6 class="mb-0">🚀 Getting started</h6>
+        <span class="small text-muted">${steps.filter(s => s.done).length}/${steps.length}</span>
+      </div>
+      ${steps.map(s => `<div class="engage-onboarding-item small ${s.done ? "done" : ""}">${s.done ? "✅" : "⬜"} ${s.label}</div>`).join("")}
+    </div>
+  `;
+}
+
+async function loadBotm() {
+  const botm = await api("/library/book-of-month");
+  const el = document.getElementById("botm-content");
+  const monthEl = document.getElementById("botm-month");
+  if (!botm) {
+    el.innerHTML = `<p class="text-muted">No Book of the Month selected yet.</p>`;
+    return;
+  }
+  const months = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+  monthEl.textContent = `— ${months[botm.month]} ${botm.year}`;
+  el.innerHTML = `
+    <div class="d-flex gap-3">
+      ${bookCoverHtml(botm.book, "width:90px; min-width:90px; height:120px;")}
+      <div>
+        <h6 class="mb-1">${botm.book.title}</h6>
+        <div class="text-muted small mb-2">by ${botm.book.author}</div>
+        <p class="small">${botm.reading_guide || ""}</p>
+        <a href="book.html?id=${botm.book.id}" class="btn btn-sm btn-rc-gold">Read Now</a>
+      </div>
+    </div>
+  `;
+}
+
+async function loadContinueReading() {
+  const books = await api("/library/books/continue-reading");
+  const el = document.getElementById("continue-reading");
+  el.innerHTML = "";
+  if (!books.length) {
+    el.innerHTML = `<p class="text-muted small">You haven't started a book yet. <a href="library.html">Browse the library</a>.</p>`;
+    return;
+  }
+  books.slice(0, 4).forEach(b => {
+    el.innerHTML += `
+      <div class="col-6 col-md-3">
+        <a href="book.html?id=${b.id}" class="text-decoration-none text-dark">
+          ${bookCoverHtml(b, "")}
+          <div class="small mt-1">${b.title}</div>
+        </a>
+      </div>`;
+  });
+}
+
+async function loadGoals() {
+  const goals = await api("/progress/goals");
+  const el = document.getElementById("goals-list");
+  if (!goals.length) {
+    el.innerHTML = `<p class="text-muted small mb-0">No goals set yet.</p>`;
+    return;
+  }
+  el.innerHTML = goals.map(g => {
+    const pct = Math.min(100, Math.round((g.books_completed / g.target_books) * 100));
+    return `
+      <div class="mb-2">
+        <div class="d-flex justify-content-between small">
+          <span>${g.goal_type === "monthly" ? "Monthly" : "Annual"} Goal (${g.year})</span>
+          <span>${g.books_completed}/${g.target_books} books</span>
+        </div>
+        <div class="progress" style="height:6px;">
+          <div class="progress-bar" style="width:${pct}%; background: var(--rc-purple);"></div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function loadRecommended() {
+  const books = await api("/library/books/recommended");
+  const el = document.getElementById("recommended-list");
+  if (!books.length) {
+    el.innerHTML = `<p class="text-muted small mb-0">No recommendations yet.</p>`;
+    return;
+  }
+  el.innerHTML = books.slice(0, 4).map(b => `
+    <a href="book.html?id=${b.id}" class="d-flex align-items-center text-decoration-none text-dark mb-2">
+      ${bookCoverHtml(b, "width:44px; height:60px; font-size:0.55rem; min-width:44px; margin-right:0.5rem;", 12)}
+      <div>
+        <div class="small fw-bold">${b.title}</div>
+        <div class="text-muted" style="font-size:0.75rem;">${b.author}</div>
+      </div>
+    </a>
+  `).join("");
+}
+
+async function createGoal() {
+  const goal_type = document.getElementById("goal_type").value;
+  const target_books = parseInt(document.getElementById("target_books").value);
+  const now = new Date();
+  const payload = {
+    goal_type, target_books, year: now.getFullYear(),
+    month: goal_type === "monthly" ? now.getMonth() + 1 : null,
+  };
+  await api("/progress/goals", { method: "POST", body: JSON.stringify(payload) });
+  bootstrap.Modal.getInstance(document.getElementById("goalModal")).hide();
+  loadGoals();
+}
+
+loadSummary();
+loadBotm();
+loadContinueReading();
+loadGoals();
+loadRecommended();
+renderOnboarding();
+</script>
+</body>
+</html>

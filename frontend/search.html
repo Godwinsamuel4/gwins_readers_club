@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Search — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 class="mb-1">🔎 Search Results</h3>
+  <p class="text-muted small" id="search-summary"></p>
+
+  <h5 class="mt-4">Books</h5>
+  <div class="row g-3" id="search-books">Loading...</div>
+
+  <h5 class="mt-4">Discussions</h5>
+  <div id="search-discussions">Loading...</div>
+
+  <h5 class="mt-4">Resources</h5>
+  <div id="search-resources">Loading...</div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("");
+const params = new URLSearchParams(window.location.search);
+const q = params.get("q") || "";
+document.getElementById("nav-search-input") && (document.getElementById("nav-search-input").value = q);
+
+async function runSearch() {
+  if (!q) {
+    document.getElementById("search-summary").textContent = "Enter a search term above.";
+    return;
+  }
+  const results = await api(`/search?q=${encodeURIComponent(q)}`);
+  document.getElementById("search-summary").textContent =
+    `Results for "${q}": ${results.books.length} books, ${results.discussions.length} discussions, ${results.resources.length} resources.`;
+
+  const booksEl = document.getElementById("search-books");
+  booksEl.innerHTML = results.books.length ? results.books.map(b => `
+    <div class="col-6 col-md-3">
+      <a href="book.html?id=${b.id}" class="text-decoration-none text-dark">
+        <div class="card card-rc h-100">
+          ${bookCoverHtml(b, "")}
+          <div class="card-body p-2">
+            <div class="fw-bold small">${b.title}</div>
+            <div class="text-muted small">${b.author}</div>
+          </div>
+        </div>
+      </a>
+    </div>
+  `).join("") : `<p class="text-muted small">No matching books.</p>`;
+
+  const discEl = document.getElementById("search-discussions");
+  discEl.innerHTML = results.discussions.length ? results.discussions.map(p => `
+    <a href="discussion.html?id=${p.id}" class="text-decoration-none text-dark">
+      <div class="card card-rc p-2 mb-2"><strong class="small">${escapeHtml(p.title)}</strong> <span class="text-muted small">by ${escapeHtml(p.author_name)}</span></div>
+    </a>
+  `).join("") : `<p class="text-muted small">No matching discussions.</p>`;
+
+  const resEl = document.getElementById("search-resources");
+  resEl.innerHTML = results.resources.length ? results.resources.map(r => `
+    <a href="resources.html" class="text-decoration-none text-dark">
+      <div class="card card-rc p-2 mb-2"><strong class="small">${escapeHtml(r.title)}</strong> <span class="category-pill ms-2">${r.resource_type}</span></div>
+    </a>
+  `).join("") : `<p class="text-muted small">No matching resources.</p>`;
+}
+
+runSearch();
+</script>
+</body>
+</html>

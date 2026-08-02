@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Digital Library — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>📚 Digital Library</h3>
+    <div class="d-flex gap-2">
+      <a href="upload.html" class="btn btn-outline-secondary btn-sm">📤 Upload a Book</a>
+      <button class="btn btn-rc btn-sm" id="add-book-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#bookModal">+ Add Book</button>
+    </div>
+  </div>
+
+  <div id="botm-banner" class="mb-4"></div>
+
+  <div class="row g-2 mb-4">
+    <div class="col-md-4">
+      <input type="text" class="form-control" id="search-input" placeholder="Search title or author...">
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" id="category-filter">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" id="sort-select">
+        <option value="recent">Recently Added</option>
+        <option value="popular">Most Popular</option>
+        <option value="title">Title (A-Z)</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-rc w-100" onclick="loadBooks()">Filter</button>
+    </div>
+  </div>
+
+  <div class="row g-4" id="books-grid">Loading...</div>
+</div>
+
+<!-- Add Book Modal (admin/moderator) -->
+<div class="modal fade" id="bookModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add a Book</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="book-alert"></div>
+        <div class="row g-2">
+          <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="b_title"></div>
+          <div class="col-md-6"><label class="form-label">Author</label><input class="form-control" id="b_author"></div>
+          <div class="col-md-6"><label class="form-label">Publisher</label><input class="form-control" id="b_publisher"></div>
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select class="form-select" id="b_category"></select>
+          </div>
+          <div class="col-md-4"><label class="form-label">Pages</label><input type="number" class="form-control" id="b_pages"></div>
+          <div class="col-md-4"><label class="form-label">Reading Time (min)</label><input type="number" class="form-control" id="b_reading_time"></div>
+          <div class="col-md-4"><label class="form-label">Year</label><input type="number" class="form-control" id="b_year"></div>
+          <div class="col-md-12"><label class="form-label">Cover Color</label><input type="color" class="form-control form-control-color" id="b_color" value="#35538F"></div>
+          <div class="col-md-12"><label class="form-label">Description</label><textarea class="form-control" id="b_description" rows="2"></textarea></div>
+          <div class="col-md-12"><label class="form-label">Book Content (for online reader)</label><textarea class="form-control" id="b_content" rows="5"></textarea></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitBook()">Add Book</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("library");
+const user = getUser();
+if (user.role === "admin" || user.role === "moderator") {
+  document.getElementById("add-book-btn").style.display = "inline-block";
+}
+
+const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+async function loadBotm() {
+  const el = document.getElementById("botm-banner");
+  try {
+    const botm = await api("/library/book-of-month");
+    if (!botm) { el.innerHTML = ""; return; }
+    el.innerHTML = `
+      <div class="card card-rc p-3" style="border-left:4px solid var(--rc-gold, #c9a04a);">
+        <div class="d-flex gap-3 flex-wrap align-items-center">
+          ${bookCoverHtml(botm.book, "width:70px; min-width:70px; height:96px; font-size:0.7rem;")}
+          <div class="flex-grow-1">
+            <div class="text-uppercase small text-muted fw-bold">📖 Book of the Month — ${MONTH_NAMES[botm.month]} ${botm.year}</div>
+            <h5 class="mb-1">${botm.book.title}</h5>
+            <div class="text-muted small mb-2">by ${botm.book.author}</div>
+            ${botm.reading_guide ? `<p class="small mb-0">${botm.reading_guide}</p>` : ""}
+          </div>
+          <div class="d-flex flex-column gap-2">
+            <a href="book.html?id=${botm.book.id}" class="btn btn-sm btn-rc-gold">Read Now</a>
+            <a href="community.html?book_id=${botm.book.id}" class="btn btn-sm btn-outline-secondary">Join the Discussion</a>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    el.innerHTML = "";
+  }
+}
+
+async function loadCategories() {
+  const cats = await api("/library/categories");
+  const filterSel = document.getElementById("category-filter");
+  const formSel = document.getElementById("b_category");
+  cats.forEach(c => {
+    filterSel.innerHTML += `<option value="${c}">${c}</option>`;
+    formSel.innerHTML += `<option value="${c}">${c}</option>`;
+  });
+}
+
+function starString(rating) {
+  if (!rating) return `<span class="text-muted small">No ratings yet</span>`;
+  const full = Math.round(rating);
+  return `<span class="rating-stars">${"★".repeat(full)}${"☆".repeat(5-full)}</span> <span class="small text-muted">(${rating})</span>`;
+}
+
+async function loadBooks() {
+  const search = document.getElementById("search-input").value;
+  const category = document.getElementById("category-filter").value;
+  const sort = document.getElementById("sort-select").value;
+  const params = new URLSearchParams({ sort });
+  if (search) params.append("search", search);
+  if (category) params.append("category", category);
+
+  const books = await api(`/library/books?${params.toString()}`);
+  const grid = document.getElementById("books-grid");
+  if (!books.length) {
+    grid.innerHTML = `<p class="text-muted">No books found.</p>`;
+    return;
+  }
+  grid.innerHTML = books.map(b => `
+    <div class="col-6 col-md-4 col-lg-3">
+      <a href="book.html?id=${b.id}" class="text-decoration-none text-dark">
+        <div class="card card-rc h-100">
+          ${bookCoverHtml(b, "")}
+          <div class="card-body p-2">
+            <div class="category-pill mb-1">${b.category}</div>
+            <div class="fw-bold small">${b.title}</div>
+            <div class="text-muted small">${b.author}</div>
+            <div class="mt-1">${starString(b.average_rating)}</div>
+          </div>
+        </div>
+      </a>
+    </div>
+  `).join("");
+}
+
+async function submitBook() {
+  const payload = {
+    title: document.getElementById("b_title").value,
+    author: document.getElementById("b_author").value,
+    publisher: document.getElementById("b_publisher").value,
+    category: document.getElementById("b_category").value,
+    number_of_pages: parseInt(document.getElementById("b_pages").value) || 0,
+    reading_time_minutes: parseInt(document.getElementById("b_reading_time").value) || 0,
+    publication_year: parseInt(document.getElementById("b_year").value) || null,
+    cover_color: document.getElementById("b_color").value,
+    description: document.getElementById("b_description").value,
+    content: document.getElementById("b_content").value,
+  };
+  try {
+    await api("/library/books", { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("bookModal")).hide();
+    loadBooks();
+  } catch (err) {
+    showAlert("book-alert", err.message);
+  }
+}
+
+loadBotm();
+loadCategories();
+loadBooks();
+</script>
+</body>
+</html>

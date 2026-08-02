@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Community — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>💬 Community Discussion</h3>
+    <button class="btn btn-rc btn-sm" data-bs-toggle="modal" data-bs-target="#postModal" onclick="document.getElementById('p_book_id').value=''; document.getElementById('p_book_context').style.display='none';">+ New Post</button>
+  </div>
+
+  <div id="botm-banner" class="mb-3"></div>
+
+  <div id="book-filter-chip" class="mb-2"></div>
+
+  <div class="mb-3">
+    <div class="btn-group" id="category-tabs">
+      <button class="btn btn-outline-secondary btn-sm active" data-cat="">All</button>
+      <button class="btn btn-outline-secondary btn-sm" data-cat="general">General</button>
+      <button class="btn btn-outline-secondary btn-sm" data-cat="book">Book Talk</button>
+      <button class="btn btn-outline-secondary btn-sm" data-cat="topic">Topics</button>
+      <button class="btn btn-outline-secondary btn-sm" data-cat="qna">Q&A</button>
+      <button class="btn btn-outline-secondary btn-sm" data-cat="announcement">Announcements</button>
+    </div>
+  </div>
+
+  <div id="posts-list">Loading...</div>
+</div>
+
+<!-- New Post Modal -->
+<div class="modal fade" id="postModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Start a Discussion</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="post-alert"></div>
+        <input type="hidden" id="p_book_id">
+        <div id="p_book_context" class="small text-muted mb-2" style="display:none;"></div>
+        <div class="mb-2">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="p_category">
+            <option value="general">General</option>
+            <option value="book">Book Talk</option>
+            <option value="topic">Topic</option>
+            <option value="qna">Q&A</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="p_title"></div>
+        <div class="mb-2"><label class="form-label">Content</label><textarea class="form-control" id="p_content" rows="4"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitPost()">Post</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("community");
+let activeCategory = "";
+const urlParams = new URLSearchParams(window.location.search);
+let activeBookId = urlParams.get("book_id") ? parseInt(urlParams.get("book_id")) : null;
+let activeBookTitle = "";
+
+const MONTH_NAMES = ["","January","February","March","April","May","June","July","August","September","October","November","December"];
+
+async function loadBotm() {
+  const el = document.getElementById("botm-banner");
+  try {
+    const botm = await api("/library/book-of-month");
+    if (!botm) { el.innerHTML = ""; return; }
+    if (activeBookId === botm.book.id) activeBookTitle = botm.book.title;
+    el.innerHTML = `
+      <div class="card card-rc p-3" style="border-left:4px solid var(--rc-gold, #c9a04a);">
+        <div class="d-flex gap-3 flex-wrap align-items-center">
+          ${bookCoverHtml(botm.book, "width:60px; min-width:60px; height:84px; font-size:0.65rem;")}
+          <div class="flex-grow-1">
+            <div class="text-uppercase small text-muted fw-bold">📖 Book of the Month — ${MONTH_NAMES[botm.month]} ${botm.year}</div>
+            <h6 class="mb-1">${botm.book.title} <span class="text-muted fw-normal">by ${botm.book.author}</span></h6>
+            ${botm.discussion_questions ? `<div class="small text-muted">${botm.discussion_questions.split("\n").filter(q=>q.trim()).length} discussion questions to explore in the pinned thread</div>` : ""}
+          </div>
+          <button class="btn btn-sm btn-rc-gold" onclick="openBookDiscussion(${botm.book.id}, '${botm.book.title.replace(/'/g, "\\'")}')">Discuss This Book</button>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    el.innerHTML = "";
+  }
+}
+
+function openBookDiscussion(bookId, bookTitle) {
+  document.getElementById("p_book_id").value = bookId;
+  document.getElementById("p_category").value = "book";
+  const ctx = document.getElementById("p_book_context");
+  ctx.style.display = "block";
+  ctx.textContent = `Posting about: ${bookTitle}`;
+  new bootstrap.Modal(document.getElementById("postModal")).show();
+}
+
+function renderBookFilterChip() {
+  const el = document.getElementById("book-filter-chip");
+  if (!activeBookId) { el.innerHTML = ""; return; }
+  el.innerHTML = `
+    <span class="category-pill">Filtering: ${activeBookTitle || "this book"}
+      <a href="community.html" class="text-decoration-none ms-1" title="Clear filter">✕</a>
+    </span>
+  `;
+}
+
+async function loadPosts() {
+  const params = new URLSearchParams();
+  if (activeCategory) params.append("category", activeCategory);
+  if (activeBookId) params.append("book_id", activeBookId);
+  renderBookFilterChip();
+  const posts = await api(`/community/discussions?${params.toString()}`);
+  const el = document.getElementById("posts-list");
+  if (!posts.length) { el.innerHTML = `<p class="text-muted">No discussions yet — start one!</p>`; return; }
+  el.innerHTML = posts.map(p => `
+    <a href="discussion.html?id=${p.id}" class="text-decoration-none text-dark">
+      <div class="card card-rc p-3 mb-2">
+        <div class="d-flex justify-content-between">
+          <div>
+            ${p.is_pinned ? '<span class="badge bg-warning text-dark me-1">📌 Pinned</span>' : ""}
+            <span class="category-pill">${p.category}</span>
+            <h6 class="mt-1 mb-1">${escapeHtml(p.title)}</h6>
+            <div class="text-muted small">by ${escapeHtml(p.author_name)} · ${timeAgo(p.created_at)}</div>
+          </div>
+          <div class="text-muted small text-nowrap">💬 ${p.reply_count}</div>
+        </div>
+      </div>
+    </a>
+  `).join("");
+}
+
+document.querySelectorAll("#category-tabs button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#category-tabs button").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    activeCategory = btn.dataset.cat;
+    loadPosts();
+  });
+});
+
+async function submitPost() {
+  const bookIdVal = document.getElementById("p_book_id").value;
+  const payload = {
+    category: document.getElementById("p_category").value,
+    title: document.getElementById("p_title").value,
+    content: document.getElementById("p_content").value,
+    book_id: bookIdVal ? parseInt(bookIdVal) : null,
+  };
+  try {
+    const post = await api("/community/discussions", { method: "POST", body: JSON.stringify(payload) });
+    window.location.href = `discussion.html?id=${post.id}`;
+  } catch (err) {
+    showAlert("post-alert", err.message);
+  }
+}
+
+loadBotm();
+loadPosts();
+</script>
+</body>
+</html>

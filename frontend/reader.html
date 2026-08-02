@@ -1,0 +1,2423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reader — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+    <div>
+      <h5 id="reader-title" class="mb-0">Loading...</h5>
+      <div class="small text-muted" id="reader-subtitle"></div>
+    </div>
+    <div class="d-flex gap-2 align-items-center flex-wrap" id="toolbar-main">
+      <div class="input-group input-group-sm" style="width:auto;">
+        <input type="text" id="search-inside" class="form-control form-control-sm" style="width:150px;" placeholder="Search in book...">
+        <button class="btn btn-sm btn-outline-secondary" onclick="searchInside()" title="Search in book">🔍</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="stepSearchMatch(-1)" title="Previous match">◀</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="stepSearchMatch(1)" title="Next match">▶</button>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Text size">
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeFont(-2)" title="Smaller text">A-</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeFont(2)" title="Larger text">A+</button>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" onclick="cycleTheme()" title="Reading theme">🌓 Theme</button>
+      <button class="btn btn-sm btn-outline-secondary" id="tts-btn" onclick="toggleTTS()" title="Read aloud (or click any word in the page to start reading from there)">🔊 Read aloud</button>
+      <button class="btn btn-sm btn-rc" onclick="addBookmark()">🔖 Bookmark</button>
+
+      <div class="dropdown">
+        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+          More tools
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end reader-more-menu">
+          <li><h6 class="dropdown-header">Layout & navigation</h6></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); cycleLineSpacing();">↕ Line spacing</a></li>
+          <li><a class="dropdown-item" href="#" id="focus-btn" onclick="event.preventDefault(); toggleFocusMode();">🎯 Focus mode</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleFullscreen();">⛶ Fullscreen</a></li>
+          <li><a class="dropdown-item" href="#" id="autoscroll-btn" onclick="event.preventDefault(); toggleAutoScroll();">▶ Auto page-turn</a></li>
+          <li><a class="dropdown-item" href="#" id="voice-nav-btn" onclick="event.preventDefault(); toggleVoiceNav();">🎙️ Voice page-turning</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Reading aids</h6></li>
+          <li><a class="dropdown-item" href="#" id="dictionary-btn" onclick="event.preventDefault(); toggleDictionaryMode();">📘 Dictionary mode</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); printBook();">🖨️ Print-friendly view</a></li>
+          <li><a class="dropdown-item" href="#" id="offline-btn" onclick="event.preventDefault(); toggleSaveOffline();">📥 Save offline</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">Track your reading</h6></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleCalendarPanel();">📅 Reading calendar</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); showSessionSummary();">📊 This session's stats</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleMoodPanel();">🙂 How's this session feeling?</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); downloadReadingJourney();">🧵 Export reading journey</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); surpriseMe();">🎲 Jump to a random page</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleSettingsPanel();">⚙️ Reading settings</a></li>
+          <li><a class="dropdown-item" href="#" onclick="event.preventDefault(); toggleShortcuts();">❓ Keyboard shortcuts</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="calendar-panel d-none" id="calendar-panel">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0">📅 Reading calendar — last 12 weeks</h6>
+      <span class="small text-muted" id="calendar-total"></span>
+    </div>
+    <div id="calendar-grid" class="calendar-grid"></div>
+  </div>
+
+  <div class="stats-bar mb-2" id="toolbar-extra">
+    <span id="streak-badge">🔥 —</span> ·
+    <span id="today-badge">📖 —</span> ·
+    <span class="d-inline-flex align-items-center gap-1">
+      🎯 <span id="goal-badge">Goal: —</span>
+      <span class="goal-ring" id="goal-ring" style="--pct:0;"></span>
+    </span> ·
+    <span class="engage-timer-badge" id="engage-timer-badge">⏱️ 0 min</span>
+  </div>
+
+  <div class="mood-panel d-none" id="mood-panel"></div>
+
+  <div class="settings-panel d-none" id="settings-panel">
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Font style</label>
+        <select class="form-select form-select-sm" id="font-family-select" onchange="changeFontFamily()">
+          <option value='"Georgia","Times New Roman",serif'>Serif (classic)</option>
+          <option value='Verdana, Arial, sans-serif'>Sans-serif (clean)</option>
+          <option value='"Comic Sans MS", "Comic Sans", sans-serif'>Dyslexia-friendly</option>
+          <option value='"Courier New", monospace'>Monospace</option>
+        </select>
+        <div class="mt-1" id="font-swatches"></div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Page margins</label>
+        <select class="form-select form-select-sm" id="margin-select" onchange="changeMargins()">
+          <option value="narrow">Narrow</option>
+          <option value="medium" selected>Medium</option>
+          <option value="wide">Wide</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Screen brightness</label>
+        <input type="range" class="form-range" id="brightness-range" min="55" max="100" value="100" oninput="changeBrightness()">
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Read-aloud speed</label>
+        <select class="form-select form-select-sm" id="tts-rate-select" onchange="changeTTSRate()">
+          <option value="0.8">Slow</option>
+          <option value="1" selected>Normal</option>
+          <option value="1.3">Fast</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Read-aloud voice</label>
+        <select class="form-select form-select-sm" id="tts-voice-select" onchange="changeTTSVoice()">
+          <option value="">System default</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Auto page-turn speed</label>
+        <select class="form-select form-select-sm" id="autoscroll-speed-select" onchange="changeAutoScrollSpeed()">
+          <option value="25">Slow (25s/page)</option>
+          <option value="15" selected>Normal (15s/page)</option>
+          <option value="8">Fast (8s/page)</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Daily page goal</label>
+        <input type="number" class="form-control form-control-sm" id="goal-input" min="1" value="10" oninput="changeGoal()">
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Highlight color</label>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="color-swatch active" style="background:#fff176" data-color="#fff176" onclick="setHighlightColor(this)"></span>
+          <span class="color-swatch" style="background:#a5d6a7" data-color="#a5d6a7" onclick="setHighlightColor(this)"></span>
+          <span class="color-swatch" style="background:#f48fb1" data-color="#f48fb1" onclick="setHighlightColor(this)"></span>
+          <span class="color-swatch" style="background:#90caf9" data-color="#90caf9" onclick="setHighlightColor(this)"></span>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Page-turn sound</label>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="sound-toggle" onchange="toggleSound()">
+          <label class="form-check-label small" for="sound-toggle">Play a soft flip sound</label>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Text alignment</label>
+        <select class="form-select form-select-sm" id="align-select" onchange="changeAlignment()">
+          <option value="left" selected>Left-aligned</option>
+          <option value="justify">Justified</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Word spacing</label>
+        <select class="form-select form-select-sm" id="word-spacing-select" onchange="changeWordSpacing()">
+          <option value="normal" selected>Normal</option>
+          <option value="0.12em">Wide</option>
+          <option value="0.28em">Wider (dyslexia-friendly)</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Bold text</label>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="bold-toggle" onchange="toggleBoldText()">
+          <label class="form-check-label small" for="bold-toggle">Heavier weight for readability</label>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Annotation style</label>
+        <select class="form-select form-select-sm" id="annotation-style-select" onchange="changeAnnotationStyle()">
+          <option value="highlight" selected>Highlight</option>
+          <option value="underline">Underline</option>
+        </select>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Custom theme colors</label>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="color" class="form-control form-control-color form-control-sm" id="custom-bg-color" value="#fffdf7" title="Background">
+          <input type="color" class="form-control form-control-color form-control-sm" id="custom-text-color" value="#241F33" title="Text">
+          <button class="btn btn-sm btn-outline-secondary" onclick="applyCustomTheme()">Use</button>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <label class="form-label small mb-1">Break reminder</label>
+        <select class="form-select form-select-sm" id="break-reminder-select" onchange="changeBreakReminder()">
+          <option value="0">Off</option>
+          <option value="15">Every 15 min</option>
+          <option value="30" selected>Every 30 min</option>
+          <option value="45">Every 45 min</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress mb-1" style="height:6px;">
+    <div class="progress-bar" id="progress-bar" style="width:0%; background: var(--rc-purple);"></div>
+  </div>
+  <div class="d-flex justify-content-between align-items-center small text-muted mb-1 flex-wrap gap-1">
+    <span id="reading-estimate">—</span>
+    <span id="sync-status" class="sync-status is-saved"><span class="sync-dot"></span> Saved</span>
+    <select class="form-select form-select-sm w-auto" id="chapter-jump-select" onchange="jumpToChapterSelect()">
+      <option value="">Jump to chapter…</option>
+    </select>
+    <span id="page-indicator">Page 1 of 1</span>
+  </div>
+  <div class="reader-minimap mb-1" id="reader-minimap"></div>
+  <div class="reader-minimap-bookmarks mb-2" id="reader-minimap-bookmarks"></div>
+
+  <div id="search-results" class="mb-2"></div>
+
+  <div class="chapter-running-header" id="chapter-running-header"></div>
+
+  <div class="reader-viewport" id="reader-viewport">
+    <div class="page-nav-zone page-nav-left" onclick="prevPage()" title="Previous page">‹</div>
+    <div class="reader-spread" id="reader-spread">
+      <div class="reader-page" id="page-content">Loading book...</div>
+      <div class="reader-page reader-page-right" id="page-content-right"></div>
+    </div>
+    <div class="page-nav-zone page-nav-right" onclick="nextPage()" title="Next page">›</div>
+  </div>
+
+  <div class="d-flex justify-content-center align-items-center gap-2 mt-3 flex-wrap">
+    <button class="btn btn-sm btn-outline-secondary" onclick="prevPage()">‹ Prev</button>
+    <div class="d-flex align-items-center gap-1">
+      <span class="small text-muted">Go to page</span>
+      <input type="number" id="goto-page-input" class="form-control form-control-sm text-center" style="width:75px;" min="1">
+      <button class="btn btn-sm btn-outline-secondary" onclick="goToPageInput()">Go</button>
+    </div>
+    <button class="btn btn-sm btn-rc" onclick="nextPage()">Next ›</button>
+  </div>
+
+  <div class="row mt-4 g-3">
+    <div class="col-md-3">
+      <div class="card card-rc p-3">
+        <h6>📑 Table of Contents</h6>
+        <div id="toc-list">Scanning book...</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-rc p-3">
+        <h6>🔖 Your Bookmarks</h6>
+        <div id="bookmarks-list">None yet.</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">✨ Your Highlights</h6>
+          <button class="btn btn-sm btn-link p-0" onclick="exportHighlights()" title="Export highlights & notes as Markdown">⬇️ Export</button>
+        </div>
+        <div id="highlights-list">None yet.</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card card-rc p-3">
+        <h6>📝 Session Notes</h6>
+        <textarea id="note-input" class="form-control form-control-sm mb-2" rows="2" placeholder="Jot a thought about this page..."></textarea>
+        <button class="btn btn-sm btn-rc mb-2" onclick="addNote()">Add note</button>
+        <div id="notes-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-3 g-3">
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <h6>📚 Vocabulary</h6>
+        <div class="small text-muted mb-2">Words you've looked up with 📘 Dictionary mode. Click a word to reveal its definition.</div>
+        <div id="vocabulary-list">None yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="dictionary-popup" class="dictionary-popup d-none">
+  <div class="d-flex justify-content-between align-items-start">
+    <strong id="dictionary-word">—</strong>
+    <button type="button" class="btn-close btn-sm" onclick="closeDictionaryPopup()"></button>
+  </div>
+  <div id="dictionary-definition" class="small my-2">Looking up…</div>
+  <button class="btn btn-sm btn-rc" onclick="saveVocabularyWord()">＋ Save to vocabulary</button>
+</div>
+
+<!-- Session summary modal -->
+<div class="modal fade" id="session-summary-modal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">📊 This session</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="session-summary-body">—</div>
+    </div>
+  </div>
+</div>
+
+<div id="measurer" aria-hidden="true"></div>
+
+<!-- Toasts -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+  <div id="welcome-toast" class="toast" role="status">
+    <div class="toast-header"><strong class="me-auto">📖 Welcome back</strong>
+      <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+    </div>
+    <div class="toast-body" id="welcome-toast-body"></div>
+  </div>
+  <div id="page-turn-toast" class="toast" role="status">
+    <div class="toast-body" id="page-turn-toast-body"></div>
+  </div>
+</div>
+
+<div id="finish-banner">
+  🎉 You finished the book — great job!
+  <div class="mt-2"><button class="btn btn-sm btn-rc-gold" onclick="downloadFinishShareCard()">📤 Download a share card</button></div>
+</div>
+
+<div id="shortcuts-panel" onclick="if(event.target===this) toggleShortcuts()">
+  <div class="shortcuts-card">
+    <h6 class="mb-3">⌨️ Keyboard shortcuts</h6>
+    <div class="small mb-1"><strong>←  →</strong> — Previous / Next page</div>
+    <div class="small mb-1"><strong>F</strong> — Toggle fullscreen</div>
+    <div class="small mb-1"><strong>D</strong> — Toggle focus mode</div>
+    <div class="small mb-1"><strong>R</strong> — Toggle read-aloud</div>
+    <div class="small mb-1"><strong>B</strong> — Add bookmark</div>
+    <div class="small mb-1"><strong>W</strong> — Toggle dictionary mode</div>
+    <div class="small mb-1"><strong>V</strong> — Toggle voice navigation</div>
+    <div class="small mb-3"><strong>?</strong> — Show / hide this panel</div>
+    <button class="btn btn-sm btn-rc" onclick="toggleShortcuts()">Got it</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script src="js/engage.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("library");
+
+const params = new URLSearchParams(window.location.search);
+const bookId = params.get("id");
+const statsKey = "rc_reading_stats";
+const goalKey = "rc_reading_goal";
+const notesKey = `rc_notes_${bookId}`;
+const finishedKey = `rc_finished_${bookId}`;
+const highlightColorsKey = `rc_highlight_colors_${bookId}`;
+const soundKey = "rc_sound_enabled";
+
+let bookContent = "";
+let bookTitle = "";
+let fontSize = 17;
+let lineHeights = [1.9, 1.6, 2.2, 1.4];
+let lineHeightIdx = 0;
+let themes = ["light", "sepia", "dark"];
+let themeIdx = 0;
+let currentFontFamily = '"Georgia","Times New Roman",serif';
+let currentMargin = "medium";
+const marginPadding = { narrow: "20px 24px", medium: "34px 38px", wide: "50px 70px" };
+
+let pages = [];
+let currentPage = 0;
+let spreadMode = false;
+let saveTimer = null;
+let paginateTimer = null;
+let allHighlights = [];
+let currentHighlightColor = "#fff176";
+let soundEnabled = false;
+let audioCtx = null;
+
+/* =========================================================================
+   Sync engine — queues writes (progress, highlights, bookmarks, notes) made
+   while offline or mid-outage, and flushes them once connectivity returns.
+   Reads (GET) simply fall back to a locally cached copy — see the offline
+   book/annotation cache below.
+   ========================================================================= */
+const pendingWritesKey = "rc_pending_writes";
+const offlineBookKey = `rc_offline_book_${bookId}`;
+const offlineAnnotsKey = `rc_offline_annots_${bookId}`;
+let isFlushingWrites = false;
+
+function genLocalId() {
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isLikelyOffline(err) {
+  if (!navigator.onLine) return true;
+  if (!err) return false;
+  if (err instanceof TypeError) return true;
+  return /fetch|network|connection/i.test(err.message || "");
+}
+
+function loadPendingWrites() {
+  try { return JSON.parse(localStorage.getItem(pendingWritesKey) || "[]"); } catch (e) { return []; }
+}
+function savePendingWrites(list) {
+  try { localStorage.setItem(pendingWritesKey, JSON.stringify(list)); } catch (e) { /* storage full — best effort */ }
+}
+
+// Queues a failed write for retry. Progress updates collapse to the most
+// recent one per book (no point replaying ten stale position saves); every
+// other kind (highlight/bookmark/note create-delete-etc.) is queued as its
+// own entry so nothing is lost.
+function queueWrite(path, options, kind) {
+  const list = loadPendingWrites();
+  const entry = { qid: genLocalId(), path, options, kind, bookId, ts: Date.now() };
+  if (kind === "progress") {
+    savePendingWrites([...list.filter(item => !(item.kind === "progress" && item.bookId === bookId)), entry]);
+  } else {
+    list.push(entry);
+    savePendingWrites(list);
+  }
+}
+
+// Attempts a write; if it fails because we're offline (or the request
+// simply can't reach the server), the write is queued for later instead of
+// being silently dropped, and the caller is told so it can keep its
+// optimistic local UI update in place. Genuine server-side errors (bad
+// request, validation failure, etc.) are re-thrown as before.
+async function syncOrQueue(path, options, kind) {
+  updateSyncStatusUI("saving");
+  try {
+    const result = await api(path, options);
+    updateSyncStatusUI("saved");
+    return { ok: true, result };
+  } catch (err) {
+    if (isLikelyOffline(err)) {
+      queueWrite(path, options, kind);
+      updateSyncStatusUI("offline");
+      return { ok: false, queued: true };
+    }
+    updateSyncStatusUI(loadPendingWrites().length ? "offline" : "saved");
+    throw err;
+  }
+}
+
+async function flushPendingWrites() {
+  if (isFlushingWrites || !navigator.onLine) return;
+  const list = loadPendingWrites();
+  if (!list.length) { updateSyncStatusUI("saved"); return; }
+
+  isFlushingWrites = true;
+  updateSyncStatusUI("saving");
+  let stoppedEarly = false;
+
+  for (let i = 0; i < list.length; i++) {
+    const item = list[i];
+    try {
+      await api(item.path, item.options);
+    } catch (err) {
+      if (isLikelyOffline(err)) {
+        // Still offline (or the connection dropped again mid-flush) — keep
+        // this item and everything after it queued, and stop for now.
+        savePendingWrites(list.slice(i));
+        stoppedEarly = true;
+        break;
+      }
+      // A real server-side error (e.g. the record was already deleted) —
+      // drop it rather than retrying forever.
+    }
+  }
+
+  if (!stoppedEarly) savePendingWrites([]);
+  isFlushingWrites = false;
+  updateSyncStatusUI(stoppedEarly ? "offline" : "saved");
+  if (!stoppedEarly) {
+    // Some queued items were creates/edits — re-pull the authoritative
+    // lists from the server so local temp entries reconcile with real IDs.
+    loadHighlights().catch(() => {});
+    loadBookmarks().catch(() => {});
+    loadNotes().catch(() => {});
+  }
+}
+
+function updateSyncStatusUI(state) {
+  const el = document.getElementById("sync-status");
+  if (!el) return;
+  const pending = loadPendingWrites().filter(i => i.bookId === bookId).length;
+  el.classList.remove("is-saved", "is-saving", "is-offline");
+  if (state === "saving") {
+    el.classList.add("is-saving");
+    el.innerHTML = `<span class="sync-dot"></span> Saving…`;
+  } else if (state === "offline" || pending > 0 || !navigator.onLine) {
+    el.classList.add("is-offline");
+    el.innerHTML = `<span class="sync-dot"></span> Offline${pending ? ` — ${pending} change${pending === 1 ? "" : "s"} queued` : ""}`;
+  } else {
+    el.classList.add("is-saved");
+    el.innerHTML = `<span class="sync-dot"></span> Saved`;
+  }
+}
+
+window.addEventListener("online", flushPendingWrites);
+window.addEventListener("offline", () => updateSyncStatusUI("offline"));
+setInterval(flushPendingWrites, 20000);
+
+/* =========================================================================
+   Offline book cache — lets a previously-opened book keep working (reading,
+   highlighting, bookmarking, note-taking, progress-tracking) with no
+   connection at all. Best-effort: if localStorage is full, saving is
+   skipped rather than breaking the reader.
+   ========================================================================= */
+function isBookSavedOffline() {
+  return !!localStorage.getItem(offlineBookKey);
+}
+
+function cacheBookOffline(book) {
+  try {
+    localStorage.setItem(offlineBookKey, JSON.stringify({
+      title: book.title, author: book.author, content: bookContent, cachedAt: Date.now(),
+    }));
+    return true;
+  } catch (e) {
+    return false; // likely quota exceeded — reading still works online-only
+  }
+}
+
+function loadOfflineBook() {
+  try { return JSON.parse(localStorage.getItem(offlineBookKey) || "null"); } catch (e) { return null; }
+}
+
+function cacheAnnotsOffline() {
+  try {
+    localStorage.setItem(offlineAnnotsKey, JSON.stringify({ highlights: allHighlights, bookmarks: allBookmarks }));
+  } catch (e) { /* best effort */ }
+}
+
+function loadOfflineAnnots() {
+  try { return JSON.parse(localStorage.getItem(offlineAnnotsKey) || "null"); } catch (e) { return null; }
+}
+
+function updateOfflineButton() {
+  const btn = document.getElementById("offline-btn");
+  if (!btn) return;
+  const saved = isBookSavedOffline();
+  btn.classList.toggle("is-saved-offline", saved);
+  btn.title = saved ? "Saved for offline reading — click to remove" : "Save this book for offline reading";
+  btn.textContent = saved ? "✅ Offline" : "📥 Save offline";
+}
+
+function toggleSaveOffline() {
+  if (isBookSavedOffline()) {
+    localStorage.removeItem(offlineBookKey);
+    localStorage.removeItem(offlineAnnotsKey);
+    updateOfflineButton();
+    return;
+  }
+  const ok = cacheBookOffline({ title: bookTitle, author: document.getElementById("reader-title").textContent.split(" — ")[1] || "" });
+  if (ok) {
+    cacheAnnotsOffline();
+    document.getElementById("page-turn-toast-body").textContent = "📥 Saved for offline reading.";
+    new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 2500 }).show();
+  } else {
+    alert("Couldn't save this book for offline reading — your device's local storage is full.");
+  }
+  updateOfflineButton();
+}
+
+/* ---------- Load book + resume last page ---------- */
+async function loadBook() {
+  let b, usedOfflineCopy = false;
+  try {
+    b = await api(`/library/books/${bookId}`);
+  } catch (err) {
+    const cached = loadOfflineBook();
+    if (cached && isLikelyOffline(err)) {
+      b = { title: cached.title, author: cached.author, content: cached.content };
+      usedOfflineCopy = true;
+    } else {
+      document.getElementById("page-content").textContent =
+        cached ? "You're offline and this couldn't be re-verified — try again once you're back online." :
+        "Couldn't load this book. Check your connection and try again.";
+      return;
+    }
+  }
+
+  document.getElementById("reader-title").textContent = `${b.title} — ${b.author}`;
+  bookTitle = b.title;
+  bookContent = b.content || "This book has no digital text uploaded yet.";
+
+  if (usedOfflineCopy) {
+    const banner = document.createElement("div");
+    banner.className = "offline-banner";
+    banner.textContent = "📡 You're offline — showing your saved copy of this book. Changes you make will sync once you're back online.";
+    document.querySelector(".container.py-4").prepend(banner);
+  } else {
+    // Best-effort: keep the offline copy fresh whenever we do have a
+    // connection, so it's never more than one visit stale.
+    cacheBookOffline(b);
+  }
+  updateOfflineButton();
+
+  const wordCount = bookContent.trim() ? bookContent.trim().split(/\s+/).length : 0;
+  const totalMinutes = Math.round(wordCount / 200);
+  document.getElementById("reader-subtitle").textContent =
+    wordCount ? `${wordCount.toLocaleString()} words · ~${totalMinutes} min total read` : "";
+
+  let resumeOffset = 0;
+  try {
+    const progress = await api(`/library/progress/${bookId}`);
+    resumeOffset = progress.current_position || 0;
+  } catch (e) { /* no progress yet, or offline — fall back to top of book */ }
+
+  spreadMode = false;
+  document.getElementById("reader-viewport").classList.remove("spread-active");
+
+  buildTableOfContents();
+  paginate();
+  jumpToOffset(resumeOffset, true);
+  buildMinimap();
+  renderMinimapBookmarkRibbon();
+
+  if (resumeOffset > 0 && pages.length) {
+    const snippet = bookContent.substring(resumeOffset, resumeOffset + 90).trim().replace(/\s+/g, " ");
+    document.getElementById("welcome-toast-body").textContent =
+      `Resuming at page ${currentPage + 1} of ${pages.length}: "${snippet}${snippet.length === 90 ? "…" : ""}"`;
+    new bootstrap.Toast(document.getElementById("welcome-toast"), { delay: 5000 }).show();
+    Engage.ensureMascot();
+    Engage.mascotSay("Welcome back! Picking up right where you left off. 📖");
+  }
+
+  loadSettingsFromStorage();
+  renderStatsBar();
+  updateSyncStatusUI(navigator.onLine ? "saved" : "offline");
+  flushPendingWrites();
+}
+
+/* ---------- Core pagination engine ---------- */
+function detectSpreadMode() {
+  return window.matchMedia("(min-width: 992px)").matches;
+}
+
+// Every page must show at least this many words. This is a hard floor —
+// even if the height measurement below comes back wrong (e.g. paginate()
+// running before the reader viewport has finished laying out, which used
+// to make every "page" collapse down to a single character), a page can
+// never end up shorter than this.
+const MIN_WORDS_PER_PAGE = 60;
+
+function countWords(str) {
+  const t = str.trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+
+// Returns the offset (relative to the whole book) that includes at least
+// MIN_WORDS_PER_PAGE words starting from `pos`, or the end of the book if
+// there aren't that many words left.
+function minWordsEnd(pos, total) {
+  const chunk = bookContent.slice(pos, Math.min(total, pos + 20000));
+  const wordTokens = chunk.match(/\S+\s*/g) || [];
+  let acc = 0, count = 0;
+  for (const w of wordTokens) {
+    acc += w.length;
+    if (/\S/.test(w)) count++;
+    if (count >= MIN_WORDS_PER_PAGE) break;
+  }
+  return Math.min(total, pos + acc);
+}
+
+function paginate() {
+  const pageEl = document.getElementById("page-content");
+  const measurer = document.getElementById("measurer");
+  measurer.style.width = pageEl.clientWidth + "px";
+  measurer.style.fontSize = fontSize + "px";
+  measurer.style.lineHeight = lineHeights[lineHeightIdx];
+  measurer.style.fontFamily = currentFontFamily;
+  measurer.style.padding = marginPadding[currentMargin];
+  // Guard against paginate() running before the reader viewport has been
+  // laid out yet (clientHeight reads 0 or near-0 in that window) — without
+  // this fallback the binary search below can never find a fit and every
+  // "page" silently collapses to a single character.
+  const maxHeight = pageEl.clientHeight > 50 ? pageEl.clientHeight : 440;
+
+  pages = [];
+  const total = bookContent.length;
+  let pos = 0;
+
+  if (total === 0) {
+    pages.push({ start: 0, end: 0 });
+    return;
+  }
+
+  while (pos < total) {
+    let lo = 1, hi = Math.min(total - pos, 6000), best = 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      measurer.textContent = bookContent.substring(pos, pos + mid);
+      if (measurer.scrollHeight <= maxHeight) { best = mid; lo = mid + 1; }
+      else { hi = mid - 1; }
+    }
+    let end = pos + best;
+    if (end < total) {
+      let breakPos = end;
+      while (breakPos > pos + 1 && !/\s/.test(bookContent[breakPos])) breakPos--;
+      if (breakPos > pos) end = breakPos;
+      // Don't leave a chapter heading orphaned as the last line of a page —
+      // push it onto the next page instead.
+      const heading = bookHeadings.find(h => h.position > pos && h.position < end);
+      if (heading && heading.position > pos + 20) end = heading.position;
+    }
+    if (end <= pos) end = pos + 1;
+
+    // Hard floor: never finalize a page with fewer than MIN_WORDS_PER_PAGE
+    // words (unless it's the tail end of the whole book). If the measured
+    // fit came back too small — whether from a genuinely tight viewport or
+    // a bad clientHeight reading — extend forward to the word-count
+    // minimum instead. A page that overflows its box slightly is far
+    // better than one that shows a single letter.
+    if (countWords(bookContent.substring(pos, end)) < MIN_WORDS_PER_PAGE) {
+      end = Math.max(end, minWordsEnd(pos, total));
+    }
+
+    pages.push({ start: pos, end });
+    pos = end;
+    while (pos < total && bookContent[pos] === " ") pos++;
+  }
+}
+
+function repaginatePreservingPlace() {
+  const anchorOffset = pages.length ? pages[currentPage].start : 0;
+  paginate();
+  jumpToOffset(anchorOffset, true);
+  buildMinimap();
+  syncTTSToPage();
+}
+
+/* ---------- Text escaping + highlight marking ---------- */
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildPageHTML(start, end) {
+  const text = bookContent.substring(start, end);
+  const colors = JSON.parse(localStorage.getItem(highlightColorsKey) || "{}");
+  const matches = [];
+  allHighlights.forEach(h => {
+    if (!h.quoted_text) return;
+    const idx = text.indexOf(h.quoted_text);
+    if (idx >= 0) {
+      const meta = colors[h.quoted_text] || {};
+      matches.push({ idx, len: h.quoted_text.length, color: meta.color || "#fff176", style: meta.style || "highlight" });
+    }
+  });
+  if (!matches.length) return escapeHtml(text);
+  matches.sort((a, b) => a.idx - b.idx);
+  let html = "", cursor = 0;
+  matches.forEach(m => {
+    if (m.idx < cursor) return; // skip overlaps
+    html += escapeHtml(text.slice(cursor, m.idx));
+    if (m.style === "underline") {
+      html += `<span class="rc-underline" style="text-decoration-color:${m.color}">${escapeHtml(text.substr(m.idx, m.len))}</span>`;
+    } else {
+      html += `<mark class="rc-highlight" style="background:${m.color}">${escapeHtml(text.substr(m.idx, m.len))}</mark>`;
+    }
+    cursor = m.idx + m.len;
+  });
+  html += escapeHtml(text.slice(cursor));
+  return html;
+}
+
+/* ---------- Rendering ---------- */
+function renderPage(animateDir) {
+  if (!pages.length) return;
+  currentPage = Math.max(0, Math.min(currentPage, pages.length - 1));
+  if (spreadMode && currentPage % 2 === 1 && currentPage > 0) currentPage -= 1;
+
+  const left = pages[currentPage];
+  const leftEl = document.getElementById("page-content");
+  leftEl.innerHTML = buildPageHTML(left.start, left.end);
+
+  const rightEl = document.getElementById("page-content-right");
+  if (spreadMode && pages[currentPage + 1]) {
+    const right = pages[currentPage + 1];
+    rightEl.innerHTML = buildPageHTML(right.start, right.end);
+  } else {
+    rightEl.textContent = spreadMode ? "— The End —" : "";
+  }
+
+  if (animateDir) {
+    leftEl.classList.remove("page-content-fade");
+    rightEl.classList.remove("page-content-fade");
+    void leftEl.offsetWidth;
+    leftEl.classList.add("page-content-fade");
+    rightEl.classList.add("page-content-fade");
+    playPageTurnSound();
+
+    const spreadEl = document.getElementById("reader-spread");
+    spreadEl.classList.remove("page-flip-forward", "page-flip-back");
+    void spreadEl.offsetWidth;
+    spreadEl.classList.add(animateDir === "prev" ? "page-flip-back" : "page-flip-forward");
+    spreadEl.addEventListener("animationend", () => {
+      spreadEl.classList.remove("page-flip-forward", "page-flip-back");
+    }, { once: true });
+  }
+
+  updateChapterRunningHeader();
+  updatePageIndicator();
+  updateMinimapActive();
+  updateProgress();
+  checkFinished();
+}
+
+function updateChapterRunningHeader() {
+  const headerEl = document.getElementById("chapter-running-header");
+  if (!headerEl) return;
+  if (!bookHeadings.length || !pages.length) { headerEl.textContent = ""; return; }
+  const pageStart = pages[currentPage].start;
+  let current = null;
+  for (const h of bookHeadings) {
+    if (h.position <= pageStart) current = h; else break;
+  }
+  headerEl.textContent = current ? current.title : "";
+}
+
+function updatePageIndicator() {
+  const total = pages.length;
+  const label = spreadMode && pages[currentPage + 1]
+    ? `Pages ${currentPage + 1}–${currentPage + 2} of ${total}`
+    : `Page ${currentPage + 1} of ${total}`;
+  document.getElementById("page-indicator").textContent = label;
+
+  const shown = spreadMode && pages[currentPage + 1] ? 2 : 1;
+  const pagesLeft = Math.max(0, total - (currentPage + shown));
+  const avgCharsPerPage = bookContent.length / Math.max(1, total);
+  const avgWordsPerPage = avgCharsPerPage / 5.2;
+  const minutesLeft = Math.round((pagesLeft * avgWordsPerPage) / 200);
+  document.getElementById("reading-estimate").textContent =
+    pagesLeft > 0 ? `${pagesLeft} page${pagesLeft === 1 ? "" : "s"} · ~${minutesLeft} min left` : "Last page";
+}
+
+/* ---------- Mini-map ---------- */
+function buildMinimap() {
+  const el = document.getElementById("reader-minimap");
+  if (!pages.length) { el.innerHTML = ""; return; }
+  const dotCount = Math.min(pages.length, 40);
+  let html = "";
+  for (let i = 0; i < dotCount; i++) {
+    const pageIdx = Math.round((i / Math.max(1, dotCount - 1)) * (pages.length - 1));
+    html += `<span class="minimap-dot" data-page="${pageIdx}" onclick="currentPage=${pageIdx};renderPage('next');syncTTSToPage()" title="Page ${pageIdx + 1}"></span>`;
+  }
+  el.innerHTML = html;
+  updateMinimapActive();
+}
+
+function updateMinimapActive() {
+  document.querySelectorAll(".minimap-dot").forEach(d => {
+    d.classList.toggle("active", Math.abs(parseInt(d.dataset.page, 10) - currentPage) <= Math.ceil(pages.length / 40));
+  });
+}
+
+/* ---------- Navigation: buttons, keyboard, click zones, swipe, double-tap ---------- */
+function nextPage() {
+  const step = spreadMode ? 2 : 1;
+  if (currentPage + step < pages.length) currentPage += step;
+  else if (currentPage < pages.length - 1) currentPage = pages.length - 1;
+  else return;
+  bumpPagesToday();
+  sessionPagesTurned += 1;
+  renderPage("next");
+  syncTTSToPage();
+}
+
+function prevPage() {
+  const step = spreadMode ? 2 : 1;
+  if (currentPage - step >= 0) currentPage -= step;
+  else if (currentPage > 0) currentPage = 0;
+  else return;
+  renderPage("prev");
+  syncTTSToPage();
+}
+
+document.addEventListener("keydown", (e) => {
+  const tag = document.activeElement.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA") return;
+  if (e.key === "ArrowRight") nextPage();
+  if (e.key === "ArrowLeft") prevPage();
+  if (e.key === "f" || e.key === "F") toggleFullscreen();
+  if (e.key === "d" || e.key === "D") toggleFocusMode();
+  if (e.key === "r" || e.key === "R") toggleTTS();
+  if (e.key === "b" || e.key === "B") addBookmark();
+  if (e.key === "w" || e.key === "W") toggleDictionaryMode();
+  if (e.key === "v" || e.key === "V") toggleVoiceNav();
+  if (e.key === "?") toggleShortcuts();
+});
+
+let touchStartX = 0, touchStartY = 0, lastTapTime = 0;
+const viewportEl = document.getElementById("reader-viewport");
+viewportEl.addEventListener("touchstart", (e) => {
+  touchStartX = e.changedTouches[0].clientX;
+  touchStartY = e.changedTouches[0].clientY;
+}, { passive: true });
+viewportEl.addEventListener("touchend", (e) => {
+  const endX = e.changedTouches[0].clientX;
+  const endY = e.changedTouches[0].clientY;
+  const deltaX = endX - touchStartX;
+  const deltaY = endY - touchStartY;
+  const now = Date.now();
+
+  if (Math.abs(deltaX) < 10 && Math.abs(deltaY) < 10) {
+    // A tap. Prevent the browser's synthesized click so the nav-zone's own
+    // onclick doesn't ALSO fire (which used to cause a double page-turn on
+    // double-tap-to-bookmark, and an occasional double-nav on single tap).
+    e.preventDefault();
+    if (now - lastTapTime < 300) {
+      quickBookmark();
+      lastTapTime = 0;
+      return;
+    }
+    lastTapTime = now;
+    const navZone = e.target.closest && e.target.closest(".page-nav-zone");
+    if (navZone) {
+      navZone.classList.contains("page-nav-left") ? prevPage() : nextPage();
+    }
+  } else if (Math.abs(deltaX) > 50) {
+    e.preventDefault();
+    deltaX < 0 ? nextPage() : prevPage();
+  }
+}, { passive: false });
+
+/* ---------- Jump to a character offset -> correct page ---------- */
+function jumpToOffset(offset, skipAnimation) {
+  if (!pages.length) return;
+  let lo = 0, hi = pages.length - 1, found = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (pages[mid].start <= offset) { found = mid; lo = mid + 1; }
+    else { hi = mid - 1; }
+  }
+  currentPage = found;
+  renderPage(skipAnimation ? null : "next");
+  if (!skipAnimation) syncTTSToPage();
+}
+
+function goToPageInput() {
+  const n = parseInt(document.getElementById("goto-page-input").value, 10);
+  if (!n || n < 1 || n > pages.length) return;
+  currentPage = n - 1;
+  renderPage("next");
+  syncTTSToPage();
+}
+
+function surpriseMe() {
+  if (!pages.length) return;
+  currentPage = Math.floor(Math.random() * pages.length);
+  renderPage("next");
+  syncTTSToPage();
+  document.getElementById("page-turn-toast-body").textContent = "🎲 Surprise! Landed on page " + (currentPage + 1) + ".";
+  new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 2500 }).show();
+}
+
+/* ---------- Progress bar + autosave resume ---------- */
+function updateProgress() {
+  const shown = spreadMode && pages[currentPage + 1] ? 2 : 1;
+  const percent = pages.length ? Math.min(100, ((currentPage + shown) / pages.length) * 100) : 0;
+  document.getElementById("progress-bar").style.width = `${percent}%`;
+
+  if (pages.length && pages[currentPage]) {
+    bumpFurthestOffset(pages[currentPage].end);
+    if (bookHeadings.length) renderTocProgress();
+  }
+
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    syncOrQueue("/library/progress", {
+      method: "POST",
+      body: JSON.stringify({
+        book_id: parseInt(bookId),
+        percent_complete: Math.round(percent * 10) / 10,
+        current_position: pages[currentPage].start,
+      }),
+    }, "progress").catch(() => {});
+  }, 800);
+}
+
+function checkFinished() {
+  const shown = spreadMode && pages[currentPage + 1] ? 2 : 1;
+  const isLast = currentPage + shown >= pages.length;
+  if (isLast && pages.length > 1 && !localStorage.getItem(finishedKey)) {
+    localStorage.setItem(finishedKey, "1");
+    celebrateFinish();
+  }
+}
+
+/* ---------- Font size ---------- */
+function changeFont(delta) {
+  fontSize = Math.max(12, Math.min(28, fontSize + delta));
+  const px = `${fontSize}px`;
+  document.getElementById("page-content").style.fontSize = px;
+  document.getElementById("page-content-right").style.fontSize = px;
+  repaginatePreservingPlace();
+}
+
+function changeFontFamily() {
+  currentFontFamily = document.getElementById("font-family-select").value;
+  document.getElementById("page-content").style.fontFamily = currentFontFamily;
+  document.getElementById("page-content-right").style.fontFamily = currentFontFamily;
+  localStorage.setItem("rc_font_family", currentFontFamily);
+  repaginatePreservingPlace();
+}
+
+function changeMargins() {
+  currentMargin = document.getElementById("margin-select").value;
+  const padding = marginPadding[currentMargin];
+  document.getElementById("page-content").style.padding = padding;
+  document.getElementById("page-content-right").style.padding = padding;
+  localStorage.setItem("rc_margin", currentMargin);
+  repaginatePreservingPlace();
+}
+
+function cycleLineSpacing() {
+  lineHeightIdx = (lineHeightIdx + 1) % lineHeights.length;
+  const lh = lineHeights[lineHeightIdx];
+  document.getElementById("page-content").style.lineHeight = lh;
+  document.getElementById("page-content-right").style.lineHeight = lh;
+  repaginatePreservingPlace();
+}
+
+function changeBrightness() {
+  const val = document.getElementById("brightness-range").value;
+  document.getElementById("reader-viewport").style.filter = `brightness(${val}%)`;
+  localStorage.setItem("rc_brightness", val);
+}
+
+/* ---------- Themes ---------- */
+function cycleTheme() {
+  themeIdx = (themeIdx + 1) % themes.length;
+  const vp = document.getElementById("reader-viewport");
+  vp.classList.remove("theme-light", "theme-sepia", "theme-dark");
+  vp.classList.add(`theme-${themes[themeIdx]}`);
+}
+
+/* ---------- Repaginate on resize (single page only — spread mode disabled) ---------- */
+window.addEventListener("resize", () => {
+  clearTimeout(paginateTimer);
+  paginateTimer = setTimeout(() => {
+    repaginatePreservingPlace();
+  }, 300);
+});
+
+/* ---------- Table of contents (+ per-chapter progress) ---------- */
+let bookHeadings = [];
+
+function buildTableOfContents() {
+  const el = document.getElementById("toc-list");
+  const lines = bookContent.split("\n");
+  const headings = [];
+  let offset = 0;
+  const headingPattern = /^(chapter|part|day|lesson)\s+\S+/i;
+  lines.forEach(line => {
+    const trimmed = line.trim();
+    if (trimmed.length > 0 && trimmed.length < 80 && headingPattern.test(trimmed)) {
+      headings.push({ title: trimmed, position: offset });
+    }
+    offset += line.length + 1;
+  });
+  bookHeadings = headings;
+  populateChapterJumpSelect();
+  if (!headings.length) {
+    el.innerHTML = `<p class="text-muted small mb-0">No chapter markers detected in this book.</p>`;
+    return;
+  }
+  renderTocProgress();
+}
+
+function renderTocProgress() {
+  const el = document.getElementById("toc-list");
+  if (!bookHeadings.length) return;
+  const furthest = getFurthestOffset();
+  el.innerHTML = bookHeadings.map((h, i) => {
+    const nextPos = bookHeadings[i + 1] ? bookHeadings[i + 1].position : bookContent.length;
+    const span = Math.max(1, nextPos - h.position);
+    const readInChapter = Math.min(span, Math.max(0, furthest - h.position));
+    const pct = Math.round((readInChapter / span) * 100);
+    return `
+      <button class="btn btn-sm btn-link p-0 d-block text-start w-100" onclick="jumpTo(${h.position})">${h.title}</button>
+      <div class="progress mb-2" style="height:4px;"><div class="progress-bar" style="width:${pct}%; background: var(--rc-purple);"></div></div>
+    `;
+  }).join("");
+}
+
+function getFurthestOffset() {
+  const key = `rc_furthest_${bookId}`;
+  return parseInt(localStorage.getItem(key) || "0", 10);
+}
+
+function bumpFurthestOffset(offset) {
+  const key = `rc_furthest_${bookId}`;
+  if (offset > getFurthestOffset()) localStorage.setItem(key, offset);
+}
+
+function populateChapterJumpSelect() {
+  const sel = document.getElementById("chapter-jump-select");
+  sel.innerHTML = `<option value="">Jump to chapter…</option>` +
+    bookHeadings.map((h, i) => `<option value="${h.position}">${h.title}</option>`).join("");
+}
+
+function jumpToChapterSelect() {
+  const sel = document.getElementById("chapter-jump-select");
+  const pos = parseInt(sel.value, 10);
+  if (!isNaN(pos)) jumpTo(pos);
+  sel.value = "";
+}
+
+function jumpTo(pos) {
+  jumpToOffset(pos);
+}
+
+/* ---------- Bookmarks ---------- */
+function addBookmark() {
+  const pop = openAnnotPopover(window.innerWidth / 2, 120, `
+    <div class="small fw-semibold mb-2">🔖 Bookmark this page</div>
+    <input type="text" id="annot-bm-label" value="Page ${currentPage + 1}">
+    <div class="d-flex gap-2 mt-2" id="annot-bm-colors">
+      ${[["#e0b64a", "Gold"], ["#7a4fc0", "Purple"], ["#3F7856", "Green"], ["#c0504f", "Red"]]
+        .map(([c, name], i) => `<span class="sel-swatch" style="background:${c};${i === 0 ? "outline:2px solid #333;" : ""}" data-color="${c}" title="${name}" onclick="selectBmColor(this)"></span>`).join("")}
+    </div>
+    <div class="annot-popover-actions">
+      <button class="btn btn-sm btn-outline-secondary" onclick="closeAnnotPopover()">Cancel</button>
+      <button class="btn btn-sm btn-rc" onclick="submitAddBookmark()">Save</button>
+    </div>
+  `);
+  pop.dataset.color = "#e0b64a";
+  document.getElementById("annot-bm-label").focus();
+}
+
+function selectBmColor(el) {
+  const pop = document.getElementById("annot-popover");
+  pop.dataset.color = el.dataset.color;
+  pop.querySelectorAll("#annot-bm-colors .sel-swatch").forEach(s => s.style.outline = "");
+  el.style.outline = "2px solid #333";
+}
+
+function submitAddBookmark() {
+  const pop = document.getElementById("annot-popover");
+  const label = document.getElementById("annot-bm-label").value.trim() || `Page ${currentPage + 1}`;
+  const color = pop.dataset.color || "#e0b64a";
+  closeAnnotPopover();
+  createBookmark(label, color);
+}
+
+// Shared by the popover form above and the one-click 🔖 toolbar action.
+// Adds the bookmark to the UI immediately (optimistic) so it works the same
+// whether we're online or not; syncOrQueue reconciles with the server (or
+// queues it) in the background.
+async function createBookmark(label, color) {
+  const tempId = `temp-${genLocalId()}`;
+  const position = pages[currentPage].start;
+  allBookmarks = [...allBookmarks, { id: tempId, position, label, _pending: true }];
+  setBookmarkColor(tempId, color);
+  loadBookmarks(true);
+
+  let outcome;
+  try {
+    outcome = await syncOrQueue("/library/bookmarks", {
+      method: "POST",
+      body: JSON.stringify({ book_id: parseInt(bookId), position, label }),
+    }, "bookmark-create");
+  } catch (e) {
+    outcome = { ok: false, queued: false };
+  }
+
+  if (outcome.ok && outcome.result && outcome.result.id) {
+    setBookmarkColor(outcome.result.id, color);
+    loadBookmarks();
+  } else if (outcome.queued) {
+    cacheAnnotsOffline();
+  }
+}
+
+async function quickBookmark() {
+  await createBookmark(`Quick bookmark — page ${currentPage + 1}`, "#e0b64a");
+  document.getElementById("page-turn-toast-body").textContent = "🔖 Bookmarked page " + (currentPage + 1) + "!";
+  new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 2000 }).show();
+}
+
+let allBookmarks = [];
+
+async function loadBookmarks(skipFetch) {
+  if (!skipFetch) {
+    try {
+      allBookmarks = await api(`/library/bookmarks/${bookId}`);
+      cacheAnnotsOffline();
+    } catch (err) {
+      const cached = loadOfflineAnnots();
+      if (cached && isLikelyOffline(err)) {
+        allBookmarks = cached.bookmarks || [];
+      } else if (!allBookmarks.length) {
+        document.getElementById("bookmarks-list").innerHTML = `<p class="text-muted small mb-0">Couldn't load bookmarks right now.</p>`;
+        return;
+      }
+    }
+  }
+  const el = document.getElementById("bookmarks-list");
+  if (!allBookmarks.length) { el.innerHTML = `<p class="text-muted small mb-0">None yet.</p>`; }
+  else {
+    el.innerHTML = allBookmarks.map(m => `
+      <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+        <span class="small"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${getBookmarkColors()[m.id] || "#e0b64a"};margin-right:5px;"></span>${escapeHtml(m.label || "Bookmark")}${m._pending ? ` <span class="text-muted">⏳ syncing</span>` : ""}</span>
+        <div>
+          <button class="btn btn-sm btn-link" onclick="jumpTo(${m.position})">Go</button>
+          ${m._pending ? "" : `<button class="btn btn-sm btn-link text-danger" onclick='removeBookmark(${JSON.stringify(m.id)})'>✕</button>`}
+        </div>
+      </div>
+    `).join("");
+  }
+  renderMinimapBookmarkRibbon();
+}
+
+function renderMinimapBookmarkRibbon() {
+  const el = document.getElementById("reader-minimap-bookmarks");
+  if (!el) return;
+  if (!allBookmarks.length || !bookContent.length) { el.innerHTML = ""; return; }
+  el.innerHTML = allBookmarks.map(m => {
+    const pct = Math.min(100, Math.max(0, (m.position / bookContent.length) * 100));
+    const color = getBookmarkColors()[m.id] || "#e0b64a";
+    return `<span class="minimap-bookmark-tick" style="left:${pct}%; background:${color};" title="${escapeHtml(m.label || 'Bookmark')}" onclick="jumpTo(${m.position})"></span>`;
+  }).join("");
+}
+
+async function removeBookmark(id) {
+  allBookmarks = allBookmarks.filter(m => m.id !== id);
+  loadBookmarks(true);
+  let outcome;
+  try { outcome = await syncOrQueue(`/library/bookmarks/${id}`, { method: "DELETE" }, "bookmark-delete"); }
+  catch (e) { outcome = { ok: false, queued: false }; }
+  if (outcome.queued) cacheAnnotsOffline(); else loadBookmarks();
+}
+
+/* ---------- Highlights (multi-color, shown in-page) ---------- */
+async function loadHighlights(skipFetch) {
+  if (!skipFetch) {
+    try {
+      allHighlights = await api(`/library/highlights/${bookId}`);
+      cacheAnnotsOffline();
+    } catch (err) {
+      const cached = loadOfflineAnnots();
+      if (cached && isLikelyOffline(err)) {
+        allHighlights = cached.highlights || [];
+      } else if (!allHighlights.length) {
+        document.getElementById("highlights-list").innerHTML = `<p class="text-muted small mb-0">Couldn't load highlights right now.</p>`;
+        return;
+      }
+    }
+  }
+  const el = document.getElementById("highlights-list");
+  if (!allHighlights.length) { el.innerHTML = `<p class="text-muted small mb-0">None yet. Select text to highlight.</p>`; return; }
+  const colors = JSON.parse(localStorage.getItem(highlightColorsKey) || "{}");
+  el.innerHTML = allHighlights.map(h => `
+    <div class="border-bottom py-1 d-flex gap-2 align-items-start">
+      <span class="color-swatch" style="background:${(colors[h.quoted_text] || {}).color || '#fff176'}; width:12px; height:12px; margin-top:4px;"></span>
+      <div class="flex-grow-1">
+        <div class="small fst-italic">"${escapeHtml(h.quoted_text)}"</div>
+        ${h.note ? `<div class="text-muted small">Note: ${escapeHtml(h.note)}</div>` : ""}
+        ${h._pending ? `<div class="text-muted small">⏳ syncing…</div>` : `
+        <div>
+          <button class="btn btn-sm btn-link p-0 me-2" onclick='copyQuote(${JSON.stringify(h.id)})' title="Copy as shareable quote">📋</button>
+          <button class="btn btn-sm btn-link p-0 me-2" onclick='editHighlightNote(${JSON.stringify(h.id)})' title="Edit note">✏️</button>
+          <button class="btn btn-sm btn-link p-0 text-danger" onclick='deleteHighlight(${JSON.stringify(h.id)})' title="Delete highlight">✕</button>
+        </div>`}
+      </div>
+    </div>
+  `).join("");
+  if (pages.length) renderPage(null);
+}
+
+function editHighlightNote(id) {
+  const h = allHighlights.find(x => x.id === id);
+  if (!h) return;
+  openAnnotPopover(window.innerWidth / 2, 120, `
+    <div class="small fw-semibold mb-2">✏️ Edit note</div>
+    <textarea id="annot-note-input" rows="3" placeholder="Add a note...">${escapeHtml(h.note || "")}</textarea>
+    <div class="annot-popover-actions">
+      <button class="btn btn-sm btn-outline-secondary" onclick="closeAnnotPopover()">Cancel</button>
+      <button class="btn btn-sm btn-rc" onclick='submitEditHighlightNote(${JSON.stringify(id)})'>Save</button>
+    </div>
+  `);
+  document.getElementById("annot-note-input").focus();
+}
+
+async function submitEditHighlightNote(id) {
+  const note = document.getElementById("annot-note-input").value.trim();
+  closeAnnotPopover();
+  const h = allHighlights.find(x => x.id === id);
+  if (h) h.note = note || null;
+  loadHighlights(true);
+  let outcome;
+  try { outcome = await syncOrQueue(`/library/highlights/${id}`, { method: "PUT", body: JSON.stringify({ note: note || null }) }, "highlight-edit"); }
+  catch (e) { outcome = { ok: false, queued: false }; }
+  if (outcome.queued) cacheAnnotsOffline(); else loadHighlights();
+}
+
+async function deleteHighlight(id) {
+  if (!confirm("Remove this highlight?")) return;
+  allHighlights = allHighlights.filter(h => h.id !== id);
+  loadHighlights(true);
+  let outcome;
+  try { outcome = await syncOrQueue(`/library/highlights/${id}`, { method: "DELETE" }, "highlight-delete"); }
+  catch (e) { outcome = { ok: false, queued: false }; }
+  if (outcome.queued) cacheAnnotsOffline(); else loadHighlights();
+}
+
+function copyQuote(id) {
+  const h = allHighlights.find(x => x.id === id);
+  if (!h) return;
+  const title = document.getElementById("reader-title").textContent;
+  const text = `"${h.quoted_text}" — ${title}`;
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById("page-turn-toast-body").textContent = "📋 Quote copied to clipboard.";
+    new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 2000 }).show();
+  }).catch(() => alert(text));
+}
+
+/* ---------- Export highlights & notes as Markdown ---------- */
+async function exportHighlights() {
+  const title = document.getElementById("reader-title").textContent;
+  let notes = [];
+  try { notes = await api(`/journal?entry_type=note&book_id=${bookId}`); } catch (e) { /* export what we have */ }
+  let md = `# Highlights & Notes — ${title}\n\n`;
+  md += `## Highlights\n\n`;
+  md += allHighlights.length
+    ? allHighlights.map(h => `> ${h.quoted_text}\n${h.note ? `\n*Note: ${h.note}*\n` : ""}`).join("\n")
+    : "_None yet._\n";
+  md += `\n\n## Session Notes\n\n`;
+  md += notes.length
+    ? notes.map(n => `- ${n.content}`).join("\n")
+    : "_None yet._\n";
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/[^\w\- ]/g, "")} - highlights.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function setHighlightColor(el) {
+  document.querySelectorAll(".color-swatch").forEach(s => s.classList.remove("active"));
+  el.classList.add("active");
+  currentHighlightColor = el.dataset.color;
+  localStorage.setItem("rc_highlight_color", currentHighlightColor);
+}
+
+/* ---------- Inline annotation popover (replaces prompt()/confirm() for
+   annotation content — used by bookmark labeling and note editing above) ---------- */
+function closeAnnotPopover() {
+  document.querySelectorAll(".annot-popover, .annot-popover-backdrop").forEach(el => el.remove());
+}
+
+function openAnnotPopover(x, y, innerHTML) {
+  closeAnnotPopover();
+  const backdrop = document.createElement("div");
+  backdrop.className = "annot-popover-backdrop";
+  backdrop.onclick = closeAnnotPopover;
+  document.body.appendChild(backdrop);
+
+  const pop = document.createElement("div");
+  pop.className = "annot-popover";
+  pop.id = "annot-popover";
+  pop.innerHTML = innerHTML;
+  document.body.appendChild(pop);
+
+  const w = pop.offsetWidth || 260, h = pop.offsetHeight || 140;
+  const left = Math.min(Math.max(10, x - w / 2), window.innerWidth - w - 10);
+  const top = Math.min(Math.max(10, y), window.innerHeight - h - 10);
+  pop.style.left = `${left}px`;
+  pop.style.top = `${top}px`;
+  return pop;
+}
+
+/* ---------- Selection toolbar: highlight / note / bookmark / copy without
+   any blocking confirm()/prompt() dialogs ---------- */
+let currentSelectionText = "";
+
+function hideSelectionToolbar() {
+  const el = document.getElementById("selection-toolbar");
+  if (el) el.remove();
+}
+
+function handleSelection() {
+  const selection = window.getSelection();
+  const text = selection.toString().trim();
+  if (text.length > 3 && text.length < 500 && selection.rangeCount) {
+    currentSelectionText = text;
+    const rect = selection.getRangeAt(0).getBoundingClientRect();
+    if (rect.width || rect.height) showSelectionToolbar(rect);
+  } else {
+    hideSelectionToolbar();
+  }
+}
+
+function showSelectionToolbar(rect) {
+  hideSelectionToolbar();
+  const bar = document.createElement("div");
+  bar.className = "selection-toolbar";
+  bar.id = "selection-toolbar";
+  const swatchColors = ["#fff176", "#a5d6a7", "#f48fb1", "#90caf9"];
+  bar.innerHTML = `
+    ${swatchColors.map(c => `<span class="sel-swatch" style="background:${c}" data-color="${c}" title="Highlight"></span>`).join("")}
+    <span class="sel-divider"></span>
+    <button class="sel-btn" data-action="note" title="Highlight with a note">📝 Note</button>
+    <button class="sel-btn" data-action="bookmark" title="Bookmark this page">🔖</button>
+    <button class="sel-btn" data-action="copy" title="Copy text">📋</button>
+  `;
+  document.body.appendChild(bar);
+  const left = Math.min(Math.max(70, rect.left + rect.width / 2), window.innerWidth - 70);
+  bar.style.left = `${left}px`;
+  bar.style.top = `${Math.max(50, rect.top - 10)}px`;
+
+  bar.querySelectorAll(".sel-swatch").forEach(sw => {
+    sw.addEventListener("click", () => createHighlightFromSelection(sw.dataset.color, null));
+  });
+  bar.querySelector('[data-action="note"]').addEventListener("click", () => openNotePopoverForSelection(rect));
+  bar.querySelector('[data-action="bookmark"]').addEventListener("click", () => { hideSelectionToolbar(); quickBookmark(); });
+  bar.querySelector('[data-action="copy"]').addEventListener("click", () => {
+    hideSelectionToolbar();
+    navigator.clipboard?.writeText(currentSelectionText).then(() => {
+      document.getElementById("page-turn-toast-body").textContent = "📋 Text copied to clipboard.";
+      new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 2000 }).show();
+    }).catch(() => {});
+  });
+}
+
+function openNotePopoverForSelection(rect) {
+  hideSelectionToolbar();
+  openAnnotPopover(rect.left + rect.width / 2, rect.top + 20, `
+    <div class="small fw-semibold mb-2">📝 Highlight with a note</div>
+    <div class="small fst-italic text-muted mb-2">"${escapeHtml(currentSelectionText.slice(0, 90))}${currentSelectionText.length > 90 ? "…" : ""}"</div>
+    <textarea id="annot-sel-note-input" rows="3" placeholder="What made this stand out?"></textarea>
+    <div class="annot-popover-actions">
+      <button class="btn btn-sm btn-outline-secondary" onclick="closeAnnotPopover()">Cancel</button>
+      <button class="btn btn-sm btn-rc" onclick="submitNoteForSelection()">Save</button>
+    </div>
+  `);
+  document.getElementById("annot-sel-note-input").focus();
+}
+
+function submitNoteForSelection() {
+  const note = document.getElementById("annot-sel-note-input").value.trim();
+  closeAnnotPopover();
+  createHighlightFromSelection(currentHighlightColor, note || null);
+}
+
+// Creates the highlight optimistically (shows immediately) and syncs — or
+// queues the write — in the background, so highlighting works the same
+// whether the connection is up or not.
+async function createHighlightFromSelection(color, note) {
+  const text = currentSelectionText;
+  hideSelectionToolbar();
+  if (!text) return;
+
+  const style = document.getElementById("annotation-style-select").value;
+  const colors = JSON.parse(localStorage.getItem(highlightColorsKey) || "{}");
+  colors[text] = { color, style };
+  localStorage.setItem(highlightColorsKey, JSON.stringify(colors));
+
+  const tempId = `temp-${genLocalId()}`;
+  allHighlights = [...allHighlights, { id: tempId, quoted_text: text, note: note || null, _pending: true }];
+  loadHighlights(true);
+
+  let outcome;
+  try {
+    outcome = await syncOrQueue("/library/highlights", {
+      method: "POST",
+      body: JSON.stringify({ book_id: parseInt(bookId), quoted_text: text, note: note || null }),
+    }, "highlight-create");
+  } catch (e) {
+    outcome = { ok: false, queued: false };
+  }
+
+  if (outcome.queued) cacheAnnotsOffline(); else loadHighlights();
+}
+document.getElementById("page-content").addEventListener("mouseup", handleSelection);
+document.getElementById("page-content-right").addEventListener("mouseup", handleSelection);
+document.addEventListener("mousedown", (e) => {
+  const bar = document.getElementById("selection-toolbar");
+  if (bar && !bar.contains(e.target)) hideSelectionToolbar();
+});
+
+
+/* ---------- Session notes (synced via the journal API, like highlights/bookmarks) ---------- */
+function parseNoteContent(content) {
+  const m = /^\(p\.\s*(\d+)\)\s*([\s\S]*)$/.exec(content || "");
+  return m ? { page: m[1], text: m[2] } : { page: "—", text: content || "" };
+}
+
+let allNotes = [];
+
+async function loadNotes(skipFetch) {
+  const el = document.getElementById("notes-list");
+  if (!skipFetch) {
+    try {
+      allNotes = await api(`/journal?entry_type=note&book_id=${bookId}`);
+    } catch (e) { /* if this fails, leave the list as-is rather than erasing it */ return; }
+  }
+  if (!allNotes.length) { el.innerHTML = `<p class="text-muted small mb-0">No notes yet.</p>`; return; }
+  el.innerHTML = allNotes.map(n => {
+    const { page, text } = parseNoteContent(n.content);
+    return `
+    <div class="border-bottom py-1 d-flex justify-content-between">
+      <div>
+        <div class="small">${escapeHtml(text)}</div>
+        <div class="text-muted small">Page ${page}${n._pending ? " · ⏳ syncing" : ""}</div>
+      </div>
+      ${n._pending ? "" : `<button class="btn btn-sm btn-link text-danger" onclick='removeNote(${JSON.stringify(n.id)})'>✕</button>`}
+    </div>
+  `;
+  }).join("");
+}
+
+async function addNote() {
+  const input = document.getElementById("note-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  const content = `(p. ${currentPage + 1}) ${text}`;
+
+  const tempId = `temp-${genLocalId()}`;
+  allNotes = [...allNotes, { id: tempId, content, _pending: true }];
+  loadNotes(true);
+
+  let outcome;
+  try {
+    outcome = await syncOrQueue("/journal", {
+      method: "POST",
+      body: JSON.stringify({ book_id: parseInt(bookId), entry_type: "note", content }),
+    }, "note-create");
+  } catch (e) {
+    outcome = { ok: false, queued: false };
+  }
+  if (!outcome.queued) loadNotes();
+}
+
+async function removeNote(id) {
+  allNotes = allNotes.filter(n => n.id !== id);
+  loadNotes(true);
+  let outcome;
+  try { outcome = await syncOrQueue(`/journal/${id}`, { method: "DELETE" }, "note-delete"); }
+  catch (e) { outcome = { ok: false, queued: false }; }
+  if (!outcome.queued) loadNotes();
+}
+
+
+// One-time migration: move any notes saved locally before this book's notes
+// moved to the server, then stop touching localStorage for notes at all.
+async function migrateLocalNotesToServer() {
+  const raw = localStorage.getItem(notesKey);
+  if (!raw) return;
+  let localNotes = [];
+  try { localNotes = JSON.parse(raw); } catch (e) { localNotes = []; }
+  if (!localNotes.length) { localStorage.removeItem(notesKey); return; }
+  try {
+    for (const n of localNotes) {
+      await api("/journal", {
+        method: "POST",
+        body: JSON.stringify({ book_id: parseInt(bookId), entry_type: "note", content: `(p. ${n.page}) ${n.text}` }),
+      });
+    }
+    localStorage.removeItem(notesKey);
+  } catch (e) { /* leave local copy in place, we'll retry next visit */ }
+}
+
+/* ---------- Search inside ---------- */
+async function searchInside() {
+  const q = document.getElementById("search-inside").value.trim();
+  if (!q) return;
+  const r = await api(`/library/books/${bookId}/search-inside?q=${encodeURIComponent(q)}`);
+  searchMatches = r.matches;
+  searchQuery = q;
+  searchIndex = -1;
+  const el = document.getElementById("search-results");
+  if (!r.matches.length) { el.innerHTML = `<div class="text-muted small">No matches for "${escapeHtml(q)}".</div>`; return; }
+  el.innerHTML = `<div class="small">${r.matches.length} match(es) — use ◀ ▶ to step through: ` +
+    r.matches.map((m, i) => `<button class="btn btn-sm btn-outline-secondary me-1 mb-1" onclick="jumpToSearchMatch(${i})" title="${m.excerpt.replace(/"/g,'&quot;')}">...${m.excerpt.slice(0,25)}...</button>`).join("") +
+    `</div>`;
+}
+
+/* ---------- Text-to-speech read-aloud ---------- */
+let ttsSpeaking = false;
+let ttsRate = parseFloat(localStorage.getItem("rc_tts_rate") || "1");
+let ttsVoiceURI = localStorage.getItem("rc_tts_voice") || "";
+
+let ttsOriginalHTML = null;
+// Bumped on every speakCurrentPage() call. An in-flight utterance's onend/onboundary
+// checks this so that cancelling it (e.g. because the page was turned) never lets a
+// stale callback act on the page that's no longer showing.
+let ttsToken = 0;
+// Character offset (within the current page) where TTS last was — lets
+// pausing and resuming pick up mid-sentence instead of restarting the page.
+let ttsPausedOffset = 0;
+
+function populateTTSVoices() {
+  if (!("speechSynthesis" in window)) return;
+  const sel = document.getElementById("tts-voice-select");
+  if (!sel) return;
+  const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en") || !v.lang);
+  const prior = ttsVoiceURI;
+  sel.innerHTML = `<option value="">System default</option>` +
+    voices.map(v => `<option value="${v.voiceURI}">${v.name} (${v.lang})</option>`).join("");
+  if (prior && voices.some(v => v.voiceURI === prior)) sel.value = prior;
+}
+if ("speechSynthesis" in window) {
+  populateTTSVoices();
+  window.speechSynthesis.onvoiceschanged = populateTTSVoices;
+}
+
+function changeTTSVoice() {
+  ttsVoiceURI = document.getElementById("tts-voice-select").value;
+  localStorage.setItem("rc_tts_voice", ttsVoiceURI);
+}
+
+function speakCurrentPage(startOffset = 0) {
+  if (!("speechSynthesis" in window)) return;
+  window.speechSynthesis.cancel();
+  const pageEl = document.getElementById("page-content");
+  const fullText = pageEl.textContent;
+  if (!fullText) { ttsSpeaking = false; updateTTSButton(); return; }
+
+  const clamped = Math.max(0, Math.min(startOffset, fullText.length));
+  const text = fullText.slice(clamped);
+  if (!text.trim()) { ttsSpeaking = false; updateTTSButton(); return; }
+
+  ttsOriginalHTML = pageEl.innerHTML;
+  wrapWordsForKaraoke(pageEl, fullText);
+
+  const myToken = ++ttsToken;
+
+  const u = new SpeechSynthesisUtterance(text);
+  u.rate = ttsRate;
+  if (ttsVoiceURI) {
+    const voice = window.speechSynthesis.getVoices().find(v => v.voiceURI === ttsVoiceURI);
+    if (voice) u.voice = voice;
+  }
+  u.onboundary = (e) => {
+    if (myToken !== ttsToken) return; // a newer page/utterance has taken over
+    if (e.name && e.name !== "word") return;
+    ttsPausedOffset = clamped + (e.charIndex || 0);
+    highlightSpokenWord(ttsPausedOffset);
+  };
+  u.onend = () => {
+    restoreOriginalPageHTML();
+    // If this utterance was cancelled because the page changed (manual nav,
+    // jump, bookmark, etc.) a newer call has already bumped ttsToken and is
+    // handling read-aloud for the new page — don't also advance from here.
+    if (!ttsSpeaking || myToken !== ttsToken) return;
+    ttsPausedOffset = 0; // page finished naturally, so the next page starts from its top
+    const step = spreadMode ? 2 : 1;
+    if (currentPage + step < pages.length) {
+      currentPage += step;
+      bumpPagesToday();
+      sessionPagesTurned += 1;
+      renderPage("next");
+      speakCurrentPage(0);
+    } else {
+      ttsSpeaking = false;
+      updateTTSButton();
+    }
+  };
+  window.speechSynthesis.speak(u);
+}
+
+/* Keep read-aloud following the reader: call this after any user-initiated
+   page change (arrow keys, nav-zone clicks, Prev/Next buttons, minimap,
+   "go to page", chapter/bookmark jumps, search, surprise-me...) so that if
+   TTS is active it picks up on the newly-shown page instead of continuing
+   to narrate a page that's no longer visible. */
+function syncTTSToPage() {
+  ttsPausedOffset = 0; // we've left the page that offset referred to
+  if (ttsSpeaking) speakCurrentPage(0);
+}
+
+/* Click any word in the page to start (or restart) read-aloud from that exact
+   point, instead of always having to start from the top of the page. */
+function textOffsetWithinPage(containerEl, node, nodeOffset) {
+  const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, null);
+  let total = 0, n;
+  while ((n = walker.nextNode())) {
+    if (n === node) return total + nodeOffset;
+    total += n.textContent.length;
+  }
+  return null;
+}
+
+function startReadFromClick(e, containerId) {
+  if (dictionaryModeOn) return; // dictionary tap-for-definition takes priority in that mode
+  const sel = window.getSelection();
+  if (sel && sel.toString().trim().length > 0) return; // this click was really a text selection drag
+  if (!("speechSynthesis" in window)) return;
+
+  let range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(e.clientX, e.clientY);
+  } else if (document.caretPositionFromPoint) {
+    const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+    if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); }
+  }
+  const pageEl = document.getElementById(containerId);
+  if (!range || !pageEl.contains(range.startContainer)) return;
+
+  // Compute the offset within THIS page before doing anything that re-renders
+  // the DOM — after a re-render, the original text nodes are detached and can
+  // no longer be located by the walker, so this must happen first.
+  const offset = textOffsetWithinPage(pageEl, range.startContainer, range.startOffset);
+  if (offset == null) return;
+
+  // Clicking into the right-hand page of a two-page spread shifts it into the
+  // left/"current" page position so speakCurrentPage (which always reads
+  // page-content) picks up the right text; the offset above is already
+  // page-relative, so it still lines up correctly after the shift.
+  if (containerId === "page-content-right" && spreadMode && pages[currentPage + 1]) {
+    currentPage += 1;
+    renderPage();
+  }
+
+  ttsSpeaking = true;
+  updateTTSButton();
+  speakCurrentPage(offset);
+}
+document.getElementById("page-content").addEventListener("click", (e) => startReadFromClick(e, "page-content"));
+document.getElementById("page-content-right").addEventListener("click", (e) => startReadFromClick(e, "page-content-right"));
+
+/* Karaoke-style read-along: wrap each word so it can be highlighted as it's spoken */
+function wrapWordsForKaraoke(pageEl, text) {
+  const regex = /\S+/g;
+  let html = "", cursor = 0, m;
+  while ((m = regex.exec(text)) !== null) {
+    html += escapeHtml(text.slice(cursor, m.index));
+    html += `<span class="tts-word" data-start="${m.index}">${escapeHtml(m[0])}</span>`;
+    cursor = m.index + m[0].length;
+  }
+  html += escapeHtml(text.slice(cursor));
+  pageEl.innerHTML = html;
+}
+
+function highlightSpokenWord(charIndex) {
+  const pageEl = document.getElementById("page-content");
+  const spans = pageEl.querySelectorAll(".tts-word");
+  let target = null;
+  spans.forEach(s => {
+    if (parseInt(s.dataset.start, 10) <= charIndex) target = s;
+  });
+  spans.forEach(s => s.classList.remove("tts-active"));
+  if (target) {
+    target.classList.add("tts-active");
+    target.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function restoreOriginalPageHTML() {
+  const pageEl = document.getElementById("page-content");
+  if (ttsOriginalHTML !== null) pageEl.innerHTML = ttsOriginalHTML;
+  ttsOriginalHTML = null;
+}
+
+function toggleTTS() {
+  if (!("speechSynthesis" in window)) { alert("Read-aloud isn't supported in this browser."); return; }
+  if (ttsSpeaking) {
+    ttsSpeaking = false;
+    window.speechSynthesis.cancel();
+    restoreOriginalPageHTML();
+  } else {
+    ttsSpeaking = true;
+    speakCurrentPage(ttsPausedOffset);
+  }
+  updateTTSButton();
+}
+
+function updateTTSButton() {
+  document.getElementById("tts-btn").classList.toggle("btn-rc", ttsSpeaking);
+  document.getElementById("tts-btn").textContent = ttsSpeaking ? "⏸ Pause" : "🔊 Read aloud";
+}
+
+function changeTTSRate() {
+  ttsRate = parseFloat(document.getElementById("tts-rate-select").value);
+  localStorage.setItem("rc_tts_rate", ttsRate);
+}
+
+/* ---------- Hands-free auto page turn ---------- */
+let autoScrollTimer = null;
+let autoScrollSeconds = 15;
+
+function toggleAutoScroll() {
+  if (autoScrollTimer) {
+    clearInterval(autoScrollTimer);
+    autoScrollTimer = null;
+  } else {
+    autoScrollTimer = setInterval(() => {
+      const step = spreadMode ? 2 : 1;
+      if (currentPage + step < pages.length) nextPage();
+      else { clearInterval(autoScrollTimer); autoScrollTimer = null; updateAutoScrollButton(); }
+    }, autoScrollSeconds * 1000);
+  }
+  updateAutoScrollButton();
+}
+
+function updateAutoScrollButton() {
+  const btn = document.getElementById("autoscroll-btn");
+  btn.classList.toggle("btn-rc", !!autoScrollTimer);
+  btn.textContent = autoScrollTimer ? "⏸ Auto page-turn (on)" : "▶ Auto page-turn";
+}
+
+function changeAutoScrollSpeed() {
+  autoScrollSeconds = parseInt(document.getElementById("autoscroll-speed-select").value, 10);
+  localStorage.setItem("rc_autoscroll_speed", autoScrollSeconds);
+  if (autoScrollTimer) { clearInterval(autoScrollTimer); autoScrollTimer = null; toggleAutoScroll(); }
+}
+
+/* ---------- Focus mode & fullscreen ---------- */
+function toggleFocusMode() {
+  document.body.classList.toggle("focus-mode");
+}
+
+function toggleFullscreen() {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) el.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
+}
+
+/* ---------- Keyboard shortcuts panel ---------- */
+function toggleShortcuts() {
+  const panel = document.getElementById("shortcuts-panel");
+  panel.style.display = panel.style.display === "flex" ? "none" : "flex";
+}
+
+/* ---------- Settings panel ---------- */
+function toggleSettingsPanel() {
+  document.getElementById("settings-panel").classList.toggle("d-none");
+}
+
+function toggleSound() {
+  soundEnabled = document.getElementById("sound-toggle").checked;
+  localStorage.setItem(soundKey, soundEnabled ? "1" : "0");
+}
+
+function playPageTurnSound() {
+  if (!soundEnabled) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const bufferSize = audioCtx.sampleRate * 0.08;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.value = 1200;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.15;
+    src.connect(filter).connect(gain).connect(audioCtx.destination);
+    src.start();
+  } catch (e) { /* ignore audio errors */ }
+}
+
+function changeGoal() {
+  const g = parseInt(document.getElementById("goal-input").value, 10) || 10;
+  localStorage.setItem(goalKey, g);
+  renderStatsBar();
+}
+
+/* ---------- Streaks, daily stats, goal ring ---------- */
+function bumpPagesToday() {
+  const stats = getOrResetStats();
+  stats.pagesToday += 1;
+  localStorage.setItem(statsKey, JSON.stringify(stats));
+  renderStatsBar();
+  recordCalendarDay();
+  maybeTriggerChapterMoment();
+  const hour = new Date().getHours();
+  Engage.checkBadges({ streak: stats.streak, nightRead: hour >= 22, earlyRead: hour < 7 });
+}
+
+function getOrResetStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  let stats = JSON.parse(localStorage.getItem(statsKey) || "{}");
+  if (stats.lastDate !== today) {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    stats.streak = stats.lastDate === yesterday ? (stats.streak || 0) + 1 : 1;
+    stats.lastDate = today;
+    stats.pagesToday = 0;
+    stats.minutesToday = 0;
+    localStorage.setItem(statsKey, JSON.stringify(stats));
+  }
+  if (!stats.streak) stats.streak = 1;
+  return stats;
+}
+
+function renderStatsBar() {
+  const stats = getOrResetStats();
+  document.getElementById("streak-badge").textContent = `🔥 ${stats.streak}-day streak`;
+  document.getElementById("today-badge").textContent = `📖 ${stats.pagesToday || 0} pages today`;
+  const goal = parseInt(localStorage.getItem(goalKey) || "10", 10);
+  document.getElementById("goal-badge").textContent = `${stats.pagesToday || 0}/${goal} pages`;
+  const pct = Math.min(100, Math.round(((stats.pagesToday || 0) / goal) * 100));
+  document.getElementById("goal-ring").style.setProperty("--pct", pct);
+}
+
+setInterval(() => {
+  const stats = getOrResetStats();
+  stats.minutesToday = (stats.minutesToday || 0) + 1;
+  localStorage.setItem(statsKey, JSON.stringify(stats));
+}, 60000);
+
+/* ---------- Finish celebration ---------- */
+function celebrateFinish() {
+  const banner = document.getElementById("finish-banner");
+  banner.style.display = "block";
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    piece.style.left = Math.random() * 100 + "vw";
+    piece.style.background = ["#D79A3B", "#35538F", "#3F7856", "#e57373"][i % 4];
+    piece.style.animationDuration = 2 + Math.random() * 1.5 + "s";
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 4000);
+  }
+  setTimeout(() => { banner.style.display = "none"; }, 4500);
+  Engage.ensureMascot();
+  Engage.mascotSay(`🎉 You finished "${bookTitle}"! Amazing work.`, 6000);
+  const hour = new Date().getHours();
+  Engage.checkBadges({ booksCompleted: 1, nightRead: hour >= 22, earlyRead: hour < 7 });
+}
+
+/* ---------- Search navigation: step through matches + highlight on page ---------- */
+let searchMatches = [];
+let searchIndex = -1;
+let searchQuery = "";
+
+function jumpToSearchMatch(i) {
+  if (!searchMatches.length) return;
+  searchIndex = i;
+  jumpTo(searchMatches[i].position);
+  highlightSearchOnPage(searchQuery);
+}
+
+function stepSearchMatch(dir) {
+  if (!searchMatches.length) return;
+  searchIndex = (searchIndex + dir + searchMatches.length) % searchMatches.length;
+  jumpToSearchMatch(searchIndex);
+}
+
+function highlightSearchOnPage(q) {
+  if (!q) return;
+  const escQ = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${escQ})`, "gi");
+  ["page-content", "page-content-right"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.innerHTML) el.innerHTML = el.innerHTML.replace(re, `<span class="search-hit">$1</span>`);
+  });
+}
+
+/* ---------- Dictionary lookup (tap a word for its definition) ---------- */
+let dictionaryModeOn = false;
+let currentDictionaryWord = "";
+
+function toggleDictionaryMode() {
+  dictionaryModeOn = !dictionaryModeOn;
+  document.getElementById("dictionary-btn").classList.toggle("btn-rc", dictionaryModeOn);
+  document.body.classList.toggle("dictionary-mode", dictionaryModeOn);
+}
+
+function setupDictionaryClicks() {
+  ["page-content", "page-content-right"].forEach(id => {
+    document.getElementById(id).addEventListener("click", (e) => {
+      if (!dictionaryModeOn) return;
+      const sel = window.getSelection();
+      if (sel && sel.toString().trim().length > 0) return;
+      let word = "";
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        if (range && range.startContainer.textContent) {
+          const text = range.startContainer.textContent;
+          let start = range.startOffset, end = range.startOffset;
+          while (start > 0 && /\w/.test(text[start - 1])) start--;
+          while (end < text.length && /\w/.test(text[end])) end++;
+          word = text.slice(start, end);
+        }
+      }
+      if (word) lookupWord(word);
+    });
+  });
+}
+
+async function lookupWord(word) {
+  const popup = document.getElementById("dictionary-popup");
+  currentDictionaryWord = word;
+  document.getElementById("dictionary-word").textContent = word;
+  document.getElementById("dictionary-definition").textContent = "Looking up…";
+  popup.classList.remove("d-none");
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.toLowerCase())}`);
+    if (!res.ok) throw new Error("not found");
+    const data = await res.json();
+    const meaning = data[0] && data[0].meanings && data[0].meanings[0];
+    const def = meaning && meaning.definitions && meaning.definitions[0] && meaning.definitions[0].definition;
+    document.getElementById("dictionary-definition").textContent = def ? `(${meaning.partOfSpeech}) ${def}` : "No definition found.";
+  } catch (e) {
+    document.getElementById("dictionary-definition").textContent = "No definition found.";
+  }
+}
+
+function closeDictionaryPopup() {
+  document.getElementById("dictionary-popup").classList.add("d-none");
+}
+
+function saveVocabularyWord() {
+  if (!currentDictionaryWord) return;
+  const def = document.getElementById("dictionary-definition").textContent;
+  const list = JSON.parse(localStorage.getItem("rc_vocabulary") || "[]");
+  if (!list.find(v => v.word.toLowerCase() === currentDictionaryWord.toLowerCase())) {
+    list.push({ word: currentDictionaryWord, def });
+    localStorage.setItem("rc_vocabulary", JSON.stringify(list));
+  }
+  renderVocabulary();
+  closeDictionaryPopup();
+}
+
+function renderVocabulary() {
+  const list = JSON.parse(localStorage.getItem("rc_vocabulary") || "[]");
+  const el = document.getElementById("vocabulary-list");
+  if (!list.length) { el.innerHTML = `<p class="text-muted small mb-0">None yet.</p>`; return; }
+  el.innerHTML = list.map((v, i) => `
+    <div class="border-bottom py-1">
+      <button class="btn btn-sm btn-link p-0" onclick="toggleVocabDefinition(${i})"><strong>${escapeHtml(v.word)}</strong></button>
+      <button class="btn btn-sm btn-link p-0 text-danger float-end" onclick="removeVocabWord(${i})">✕</button>
+      <div class="small text-muted d-none" id="vocab-def-${i}">${escapeHtml(v.def)}</div>
+    </div>
+  `).join("");
+}
+
+function toggleVocabDefinition(i) {
+  document.getElementById(`vocab-def-${i}`).classList.toggle("d-none");
+}
+
+function removeVocabWord(i) {
+  const list = JSON.parse(localStorage.getItem("rc_vocabulary") || "[]");
+  list.splice(i, 1);
+  localStorage.setItem("rc_vocabulary", JSON.stringify(list));
+  renderVocabulary();
+}
+
+/* ---------- Voice navigation (hands-free "next" / "back") ---------- */
+let voiceRecognizer = null;
+let voiceNavOn = false;
+
+function toggleVoiceNav() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { alert("Voice navigation isn't supported in this browser."); return; }
+  if (voiceNavOn) {
+    voiceNavOn = false;
+    if (voiceRecognizer) voiceRecognizer.stop();
+  } else {
+    voiceRecognizer = new SR();
+    voiceRecognizer.continuous = true;
+    voiceRecognizer.interimResults = false;
+    voiceRecognizer.lang = "en-US";
+    voiceRecognizer.onresult = (e) => {
+      const said = e.results[e.results.length - 1][0].transcript.trim().toLowerCase();
+      if (said.includes("next")) nextPage();
+      else if (said.includes("back") || said.includes("previous")) prevPage();
+      else if (said.includes("bookmark")) quickBookmark();
+    };
+    voiceRecognizer.onend = () => { if (voiceNavOn) { try { voiceRecognizer.start(); } catch (e) {} } };
+    voiceRecognizer.onerror = () => {};
+    voiceRecognizer.start();
+    voiceNavOn = true;
+  }
+  document.getElementById("voice-nav-btn").classList.toggle("btn-rc", voiceNavOn);
+}
+
+/* ---------- Print-friendly view ---------- */
+function printBook() {
+  const title = document.getElementById("reader-title").textContent;
+  const w = window.open("", "_blank");
+  if (!w) { alert("Please allow pop-ups to print."); return; }
+  w.document.write(`<html><head><title>${title}</title><style>
+    body{font-family:Georgia,"Times New Roman",serif; padding:40px; white-space:pre-wrap; line-height:1.7; max-width:720px; margin:auto;}
+    h1{font-size:1.3rem; margin-bottom:24px;}
+  </style></head><body><h1>${title}</h1><div>${escapeHtml(bookContent)}</div></body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+
+/* ---------- Reading calendar heatmap ---------- */
+function recordCalendarDay() {
+  const key = "rc_reading_calendar";
+  const today = new Date().toISOString().slice(0, 10);
+  const cal = JSON.parse(localStorage.getItem(key) || "{}");
+  cal[today] = (cal[today] || 0) + 1;
+  localStorage.setItem(key, JSON.stringify(cal));
+}
+
+function toggleCalendarPanel() {
+  const panel = document.getElementById("calendar-panel");
+  panel.classList.toggle("d-none");
+  if (!panel.classList.contains("d-none")) buildCalendarHeatmap();
+}
+
+function buildCalendarHeatmap() {
+  const cal = JSON.parse(localStorage.getItem("rc_reading_calendar") || "{}");
+  const days = [];
+  const today = new Date();
+  for (let i = 83; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    days.push({ date: key, count: cal[key] || 0 });
+  }
+  const total = days.reduce((s, d) => s + d.count, 0);
+  document.getElementById("calendar-total").textContent = `${total} page(s) across ${Object.keys(cal).length} day(s) tracked`;
+  document.getElementById("calendar-grid").innerHTML = days.map(d => {
+    const level = d.count === 0 ? 0 : d.count < 3 ? 1 : d.count < 8 ? 2 : d.count < 15 ? 3 : 4;
+    return `<span class="cal-cell cal-level-${level}" title="${d.date}: ${d.count} page(s)"></span>`;
+  }).join("");
+}
+
+/* ---------- Session summary ---------- */
+const sessionStartTime = Date.now();
+let sessionPagesTurned = 0;
+
+function showSessionSummary() {
+  const minutes = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
+  const perHour = sessionPagesTurned > 0 ? Math.round((sessionPagesTurned / minutes) * 60) : 0;
+  const comparisonLine = paceComparisonLine(perHour);
+  if (perHour) recordSessionPace(perHour);
+  document.getElementById("session-summary-body").innerHTML = `
+    <p class="mb-1">📖 Pages turned this session: <strong>${sessionPagesTurned}</strong></p>
+    <p class="mb-1">⏱️ Time reading: <strong>${minutes} min</strong></p>
+    <p class="mb-1">⚡ Pace: <strong>${perHour} pages/hour</strong></p>
+    <p class="mb-0 small text-muted">${comparisonLine}</p>
+  `;
+  new bootstrap.Modal(document.getElementById("session-summary-modal")).show();
+}
+
+/* ---------- Text alignment, word spacing, bold, custom theme ---------- */
+function changeAlignment() {
+  const val = document.getElementById("align-select").value;
+  document.getElementById("page-content").style.textAlign = val;
+  document.getElementById("page-content-right").style.textAlign = val;
+  localStorage.setItem("rc_align", val);
+}
+
+function changeWordSpacing() {
+  const val = document.getElementById("word-spacing-select").value;
+  document.getElementById("page-content").style.wordSpacing = val;
+  document.getElementById("page-content-right").style.wordSpacing = val;
+  localStorage.setItem("rc_word_spacing", val);
+}
+
+function changeAnnotationStyle() {
+  localStorage.setItem("rc_annotation_style", document.getElementById("annotation-style-select").value);
+}
+
+function toggleBoldText() {
+  const on = document.getElementById("bold-toggle").checked;
+  document.getElementById("page-content").style.fontWeight = on ? "600" : "400";
+  document.getElementById("page-content-right").style.fontWeight = on ? "600" : "400";
+  localStorage.setItem("rc_bold", on ? "1" : "0");
+}
+
+function applyCustomTheme() {
+  const bg = document.getElementById("custom-bg-color").value;
+  const fg = document.getElementById("custom-text-color").value;
+  const vp = document.getElementById("reader-viewport");
+  vp.classList.remove("theme-light", "theme-sepia", "theme-dark");
+  vp.style.setProperty("--custom-bg", bg);
+  vp.style.setProperty("--custom-fg", fg);
+  vp.classList.add("theme-custom");
+  localStorage.setItem("rc_custom_bg", bg);
+  localStorage.setItem("rc_custom_fg", fg);
+  localStorage.setItem("rc_theme", "custom");
+  sessionStorage.setItem("rc_theme_manual_override", "1");
+}
+
+/* ---------- Break reminder ---------- */
+let breakReminderMinutes = 30;
+let breakReminderTimer = null;
+
+function changeBreakReminder() {
+  breakReminderMinutes = parseInt(document.getElementById("break-reminder-select").value, 10);
+  localStorage.setItem("rc_break_reminder", breakReminderMinutes);
+  setupBreakReminder();
+}
+
+function setupBreakReminder() {
+  clearTimeout(breakReminderTimer);
+  if (!breakReminderMinutes) return;
+  breakReminderTimer = setTimeout(() => {
+    document.getElementById("page-turn-toast-body").textContent =
+      `🧘 You've been reading for ${breakReminderMinutes} minutes — maybe time for a short break?`;
+    new bootstrap.Toast(document.getElementById("page-turn-toast"), { delay: 6000 }).show();
+    windDownNudge();
+    setupBreakReminder();
+  }, breakReminderMinutes * 60000);
+}
+
+/* ---------- #11 Font live-preview swatches ---------- */
+const FONT_SWATCHES = [
+  { label: "Serif", value: '"Georgia","Times New Roman",serif' },
+  { label: "Sans", value: 'Verdana, Arial, sans-serif' },
+  { label: "Dyslexia-friendly", value: '"Comic Sans MS", "Comic Sans", sans-serif' },
+  { label: "Mono", value: '"Courier New", monospace' },
+];
+function renderFontSwatches() {
+  const el = document.getElementById("font-swatches");
+  if (!el) return;
+  el.innerHTML = FONT_SWATCHES.map(f => `
+    <span class="engage-font-swatch ${currentFontFamily === f.value ? "active" : ""}" style="font-family:${f.value}"
+      onclick="previewFont('${f.value.replace(/'/g, "\\'")}')">${f.label} Aa</span>
+  `).join("");
+}
+function previewFont(value) {
+  document.getElementById("font-family-select").value = value;
+  changeFontFamily();
+  renderFontSwatches();
+}
+
+/* ---------- #14 Auto night mode by time of day ---------- */
+function applyAutoNightMode() {
+  const manualOverride = sessionStorage.getItem("rc_theme_manual_override");
+  if (manualOverride) return;
+  const hour = new Date().getHours();
+  const shouldBeDark = hour >= 20 || hour < 6;
+  const wantIdx = shouldBeDark ? themes.indexOf("dark") : themes.indexOf("light");
+  if (wantIdx >= 0 && wantIdx !== themeIdx) {
+    themeIdx = wantIdx;
+    const vp = document.getElementById("reader-viewport");
+    vp.classList.remove("theme-light", "theme-sepia", "theme-dark");
+    vp.classList.add(`theme-${themes[themeIdx]}`);
+  }
+}
+// Mark any manual theme cycling this session so auto night-mode doesn't fight the user's choice
+const _origCycleTheme = cycleTheme;
+cycleTheme = function () {
+  sessionStorage.setItem("rc_theme_manual_override", "1");
+  _origCycleTheme();
+  localStorage.setItem("rc_theme", themes[themeIdx]);
+};
+
+/* ---------- #19 Session timer badge with gentle wind-down ---------- */
+function updateTimerBadge() {
+  const minutes = Math.max(0, Math.round((Date.now() - sessionStartTime) / 60000));
+  const el = document.getElementById("engage-timer-badge");
+  if (el) el.textContent = `⏱️ ${minutes} min`;
+}
+setInterval(updateTimerBadge, 30000);
+
+function windDownNudge() {
+  const vp = document.getElementById("reader-viewport");
+  vp.style.transition = "filter 1.2s ease";
+  const original = vp.style.filter;
+  vp.style.filter = (original || "") + " brightness(85%)";
+  setTimeout(() => { vp.style.filter = original; }, 2500);
+}
+
+/* ---------- #5 Mood tracker panel ---------- */
+function toggleMoodPanel() {
+  const panel = document.getElementById("mood-panel");
+  panel.classList.toggle("d-none");
+  if (!panel.classList.contains("d-none")) Engage.renderMoodPicker("mood-panel");
+}
+
+/* ---------- #4/#10 Chapter-boundary trivia + self-check quiz ---------- */
+let lastChapterIndexTriggered = -1;
+function maybeTriggerChapterMoment() {
+  if (!bookHeadings.length) return;
+  const pos = pages[currentPage] ? pages[currentPage].start : 0;
+  let idx = -1;
+  for (let i = 0; i < bookHeadings.length; i++) {
+    if (bookHeadings[i].position <= pos) idx = i; else break;
+  }
+  if (idx > lastChapterIndexTriggered && idx >= 0) {
+    lastChapterIndexTriggered = idx;
+    if (idx > 0) { // don't fire the instant the book opens on chapter 1
+      if (Math.random() < 0.5) Engage.showTrivia();
+      else Engage.showChapterQuiz(bookId, bookHeadings[idx - 1] ? bookHeadings[idx - 1].title : "the last chapter");
+    }
+  }
+}
+
+/* ---------- #15 Labeled + color-coded bookmarks ----------
+   (label already persists server-side; color is a lightweight local-only accent) */
+const bookmarkColorsKey = `rc_bookmark_colors_${bookId}`;
+function getBookmarkColors() { return JSON.parse(localStorage.getItem(bookmarkColorsKey) || "{}"); }
+function setBookmarkColor(bookmarkId, color) {
+  const colors = getBookmarkColors();
+  colors[bookmarkId] = color;
+  localStorage.setItem(bookmarkColorsKey, JSON.stringify(colors));
+}
+
+/* ---------- #16 Reading pace comparison ---------- */
+const paceHistoryKey = "rc_pace_history";
+function recordSessionPace(pagesPerHour) {
+  if (!pagesPerHour) return;
+  const history = JSON.parse(localStorage.getItem(paceHistoryKey) || "[]");
+  history.push(pagesPerHour);
+  localStorage.setItem(paceHistoryKey, JSON.stringify(history.slice(-30)));
+}
+function paceComparisonLine(todayPace) {
+  const history = JSON.parse(localStorage.getItem(paceHistoryKey) || "[]");
+  if (!history.length) return "This is your first tracked session — keep going to build a baseline!";
+  const avg = Math.round(history.reduce((a, b) => a + b, 0) / history.length);
+  if (!avg) return "";
+  if (todayPace > avg) return `🚀 Faster than your average of ${avg} pages/hour!`;
+  if (todayPace < avg) return `🐢 A bit slower than your average of ${avg} pages/hour — no worries, steady wins too.`;
+  return `Right on your average pace of ${avg} pages/hour.`;
+}
+
+/* ---------- #17 Personalized reading journey export ---------- */
+async function downloadReadingJourney() {
+  const minutes = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
+  let highlightLines = "_No highlights yet._";
+  try {
+    const highlights = await api(`/library/highlights/${bookId}`);
+    if (highlights.length) {
+      highlightLines = highlights.map(h => `> ${h.quoted_text}${h.note ? `\n> — _${h.note}_` : ""}`).join("\n\n");
+    }
+  } catch (e) { /* ignore */ }
+  const md = `# My Reading Journey — ${bookTitle}\n\n` +
+    `- Pages turned this session: ${sessionPagesTurned}\n` +
+    `- Time spent this session: ${minutes} min\n` +
+    `- Current position: ${document.getElementById("page-indicator").textContent}\n\n` +
+    `## Highlights\n\n${highlightLines}\n`;
+  const blob = new Blob([md], { type: "text/markdown" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${bookTitle.replace(/[^a-z0-9]/gi, "_")}_reading_journey.md`;
+  a.click();
+}
+
+function downloadFinishShareCard() {
+  const minutes = Math.max(1, Math.round((Date.now() - sessionStartTime) / 60000));
+  Engage.downloadShareCard(bookTitle || "this book", `${pages.length} pages · finished today`);
+  Engage.checkBadges({ nightRead: new Date().getHours() >= 22, earlyRead: new Date().getHours() < 7 });
+}
+
+/* ---------- Restore saved settings on load ---------- */
+function loadSettingsFromStorage() {
+  soundEnabled = localStorage.getItem(soundKey) === "1";
+  document.getElementById("sound-toggle").checked = soundEnabled;
+  const goal = localStorage.getItem(goalKey);
+  if (goal) document.getElementById("goal-input").value = goal;
+  const brightness = localStorage.getItem("rc_brightness");
+  if (brightness) {
+    document.getElementById("brightness-range").value = brightness;
+    document.getElementById("reader-viewport").style.filter = `brightness(${brightness}%)`;
+  }
+  const align = localStorage.getItem("rc_align");
+  if (align) { document.getElementById("align-select").value = align; changeAlignment(); }
+  const wordSpacing = localStorage.getItem("rc_word_spacing");
+  if (wordSpacing) { document.getElementById("word-spacing-select").value = wordSpacing; changeWordSpacing(); }
+  const bold = localStorage.getItem("rc_bold") === "1";
+  document.getElementById("bold-toggle").checked = bold;
+  if (bold) toggleBoldText();
+  const breakVal = localStorage.getItem("rc_break_reminder");
+  if (breakVal !== null) document.getElementById("break-reminder-select").value = breakVal;
+  breakReminderMinutes = parseInt(document.getElementById("break-reminder-select").value, 10);
+  setupBreakReminder();
+
+  const savedFontFamily = localStorage.getItem("rc_font_family");
+  if (savedFontFamily) {
+    document.getElementById("font-family-select").value = savedFontFamily;
+    changeFontFamily();
+  }
+  const savedMargin = localStorage.getItem("rc_margin");
+  if (savedMargin) {
+    document.getElementById("margin-select").value = savedMargin;
+    changeMargins();
+  }
+  const savedTtsRate = localStorage.getItem("rc_tts_rate");
+  if (savedTtsRate) document.getElementById("tts-rate-select").value = savedTtsRate;
+  const savedAutoscrollSpeed = localStorage.getItem("rc_autoscroll_speed");
+  if (savedAutoscrollSpeed) {
+    document.getElementById("autoscroll-speed-select").value = savedAutoscrollSpeed;
+    autoScrollSeconds = parseInt(savedAutoscrollSpeed, 10);
+  }
+  const savedAnnotationStyle = localStorage.getItem("rc_annotation_style");
+  if (savedAnnotationStyle) document.getElementById("annotation-style-select").value = savedAnnotationStyle;
+  const savedHighlightColor = localStorage.getItem("rc_highlight_color");
+  if (savedHighlightColor) {
+    currentHighlightColor = savedHighlightColor;
+    const swatch = document.querySelector(`.color-swatch[data-color="${savedHighlightColor}"]`);
+    if (swatch) {
+      document.querySelectorAll(".color-swatch").forEach(s => s.classList.remove("active"));
+      swatch.classList.add("active");
+    }
+  }
+
+  // Theme: restore the last theme the user actually chose (custom colors or a
+  // light/sepia/dark cycle pick), and treat it as a deliberate choice that
+  // auto night-mode shouldn't immediately override on this fresh load.
+  const savedTheme = localStorage.getItem("rc_theme");
+  if (savedTheme === "custom") {
+    const bg = localStorage.getItem("rc_custom_bg");
+    const fg = localStorage.getItem("rc_custom_fg");
+    if (bg) document.getElementById("custom-bg-color").value = bg;
+    if (fg) document.getElementById("custom-text-color").value = fg;
+    applyCustomTheme();
+  } else if (savedTheme && themes.includes(savedTheme)) {
+    themeIdx = themes.indexOf(savedTheme);
+    const vp = document.getElementById("reader-viewport");
+    vp.classList.remove("theme-light", "theme-sepia", "theme-dark");
+    vp.classList.add(`theme-${themes[themeIdx]}`);
+    sessionStorage.setItem("rc_theme_manual_override", "1");
+  }
+
+  setupDictionaryClicks();
+  renderVocabulary();
+  renderFontSwatches();
+  applyAutoNightMode();
+  Engage.ensureMascot();
+}
+
+loadBook();
+loadBookmarks();
+loadHighlights();
+migrateLocalNotesToServer().then(loadNotes);
+</script>
+</body>
+</html>

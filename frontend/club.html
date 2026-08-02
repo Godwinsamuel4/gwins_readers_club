@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Club — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <a href="clubs.html" class="small">&larr; Back to Clubs</a>
+  <div id="club-detail" class="mt-3">Loading...</div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <h6>Members</h6>
+        <div id="members-list">Loading...</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between">
+          <h6>Upcoming Events</h6>
+          <button class="btn btn-sm btn-rc" id="add-event-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#eventModal">+ Add Event</button>
+        </div>
+        <div id="events-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="eventModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add Club Event</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="e_title"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="e_description" rows="2"></textarea></div>
+        <div class="mb-2"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-control" id="e_date"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitEvent()">Add Event</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("clubs");
+const params = new URLSearchParams(window.location.search);
+const clubId = params.get("id");
+const user = getUser();
+
+async function loadClub() {
+  const c = await api(`/clubs/${clubId}`);
+  const canManage = c.is_leader || ["admin", "moderator"].includes(user.role);
+  document.getElementById("club-detail").innerHTML = `
+    <div class="card card-rc p-4">
+      <div class="d-flex justify-content-between">
+        <h3>${escapeHtml(c.name)}</h3>
+        ${canManage ? `
+          <div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="editClub()">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteClub()">Delete</button>
+          </div>` : ""}
+      </div>
+      <div class="text-muted mb-2">${escapeHtml(c.school_or_org || "Independent club")} · ${c.member_count} members</div>
+      <p>${escapeHtml(c.description || "")}</p>
+      <div class="d-flex gap-2">
+        ${c.is_member
+          ? `<span class="badge bg-success" style="width:fit-content;">You're a member</span>
+             <button class="btn btn-sm btn-outline-secondary" onclick="leaveClub()">Leave Club</button>`
+          : `<button class="btn btn-rc-gold" style="width:fit-content;" onclick="joinClub()">Join Club</button>`}
+      </div>
+    </div>
+  `;
+  if (canManage || c.is_member) {
+    document.getElementById("add-event-btn").style.display = "inline-block";
+  }
+  window.currentClub = c;
+}
+
+async function editClub() {
+  const c = window.currentClub;
+  const name = prompt("Club name:", c.name);
+  if (name === null) return;
+  const description = prompt("Description:", c.description || "");
+  await api(`/clubs/${clubId}`, { method: "PUT", body: JSON.stringify({ name, description }) });
+  loadClub();
+}
+
+async function deleteClub() {
+  if (!confirm("Delete this club permanently? This removes all members and events.")) return;
+  await api(`/clubs/${clubId}`, { method: "DELETE" });
+  window.location.href = "clubs.html";
+}
+
+async function leaveClub() {
+  if (!confirm("Leave this club?")) return;
+  try {
+    await api(`/clubs/${clubId}/leave`, { method: "DELETE" });
+    window.location.href = "clubs.html";
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function joinClub() {
+  await api(`/clubs/${clubId}/join`, { method: "POST" });
+  loadClub();
+}
+
+async function loadMembers() {
+  const c = window.currentClub || await api(`/clubs/${clubId}`);
+  const canManage = c.is_leader || ["admin", "moderator"].includes(user.role);
+  const members = await api(`/clubs/${clubId}/members`);
+  const el = document.getElementById("members-list");
+  if (!members.length) { el.innerHTML = `<p class="text-muted small mb-0">No members yet.</p>`; return; }
+  el.innerHTML = members.map(m => `
+    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+      <span class="small">${escapeHtml(m.name)}</span>
+      <div>
+        ${m.is_leader ? '<span class="badge bg-warning text-dark">Leader</span>' : ""}
+        ${canManage && !m.is_leader ? `<button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="removeMember(${m.user_id})">Remove</button>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function removeMember(userId) {
+  if (!confirm("Remove this member from the club?")) return;
+  await api(`/clubs/${clubId}/members/${userId}`, { method: "DELETE" });
+  loadMembers();
+  loadClub();
+}
+
+async function loadEvents() {
+  const c = window.currentClub || await api(`/clubs/${clubId}`);
+  const canManage = c.is_leader || ["admin", "moderator"].includes(user.role);
+  const events = await api(`/clubs/${clubId}/events`);
+  const el = document.getElementById("events-list");
+  if (!events.length) { el.innerHTML = `<p class="text-muted small mb-0">No upcoming events.</p>`; return; }
+  el.innerHTML = events.map(e => `
+    <div class="border-bottom py-2 ${e.is_cancelled ? "text-muted" : ""}">
+      <div class="d-flex justify-content-between">
+        <strong class="small">${escapeHtml(e.title)} ${e.is_cancelled ? '<span class="badge bg-secondary">Cancelled</span>' : ""}</strong>
+        ${canManage && !e.is_cancelled ? `
+          <div>
+            <button class="btn btn-sm btn-link p-0" onclick="editEvent(${e.id})">Edit</button>
+            <button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="cancelEvent(${e.id})">Cancel</button>
+          </div>` : ""}
+      </div>
+      <div class="text-muted small">${new Date(e.event_date).toLocaleString()}</div>
+      <div class="small">${escapeHtml(e.description || "")}</div>
+      ${!e.is_cancelled ? `
+        <button class="btn btn-sm ${e.is_attending ? "btn-rc" : "btn-outline-secondary"} mt-1" onclick="toggleRsvp(${e.id}, ${e.is_attending})">
+          ${e.is_attending ? "✓ Going" : "RSVP"} (${e.rsvp_count})
+        </button>` : ""}
+    </div>
+  `).join("");
+}
+
+async function toggleRsvp(eventId, isAttending) {
+  await api(`/clubs/events/${eventId}/rsvp`, { method: isAttending ? "DELETE" : "POST" });
+  loadEvents();
+}
+
+async function editEvent(eventId) {
+  const title = prompt("Event title:");
+  if (title === null) return;
+  await api(`/clubs/events/${eventId}`, { method: "PUT", body: JSON.stringify({ title }) });
+  loadEvents();
+}
+
+async function cancelEvent(eventId) {
+  if (!confirm("Cancel this event?")) return;
+  await api(`/clubs/events/${eventId}`, { method: "DELETE" });
+  loadEvents();
+}
+
+async function submitEvent() {
+  const payload = {
+    title: document.getElementById("e_title").value,
+    description: document.getElementById("e_description").value,
+    event_date: new Date(document.getElementById("e_date").value).toISOString(),
+  };
+  await api(`/clubs/${clubId}/events`, { method: "POST", body: JSON.stringify(payload) });
+  bootstrap.Modal.getInstance(document.getElementById("eventModal")).hide();
+  loadEvents();
+}
+
+loadClub();
+loadMembers();
+loadEvents();
+</script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Journal — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 class="mb-1">✍️ My Reading Journal</h3>
+  <p class="text-muted small">A private space — only you can see your entries.</p>
+
+  <div class="card card-rc p-3 mb-4">
+    <h6>This Week's Reflection</h6>
+    <div id="weekly-questions" class="small text-muted mb-2"></div>
+    <textarea class="form-control mb-2" id="weekly-content" rows="3" placeholder="Answer this week's questions..."></textarea>
+    <button class="btn btn-rc btn-sm" style="width:fit-content;" onclick="submitEntry('weekly_reflection', 'weekly-content')">Save Reflection</button>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#entryModal" data-type="reflection">+ Reflection</button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#entryModal" data-type="quote">+ Favorite Quote</button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#entryModal" data-type="prayer">+ Prayer Note</button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#entryModal" data-type="action_plan">+ Action Plan</button>
+    </div>
+  </div>
+
+  <div class="mb-3 d-flex gap-2 flex-wrap">
+    <select class="form-select" style="max-width:220px;" id="filter-type" onchange="loadEntries()">
+      <option value="">All Entries</option>
+      <option value="reflection">Reflections</option>
+      <option value="note">Notes</option>
+      <option value="quote">Quotes</option>
+      <option value="prayer">Prayer Notes</option>
+      <option value="action_plan">Action Plans</option>
+      <option value="weekly_reflection">Weekly Reflections</option>
+    </select>
+    <input type="text" class="form-control" style="max-width:260px;" id="filter-keyword" placeholder="Search entries..." onkeyup="if(event.key==='Enter') loadEntries()">
+    <button class="btn btn-outline-secondary" onclick="loadEntries()">Search</button>
+  </div>
+
+  <div id="entries-list">Loading...</div>
+</div>
+
+<div class="modal fade" id="entryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="entry-modal-title">New Entry</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <textarea class="form-control" id="modal-entry-content" rows="4" placeholder="Write here..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" id="modal-save-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("journal");
+
+const typeLabels = {
+  reflection: "Reflection", note: "Note", quote: "Favorite Quote",
+  prayer: "Prayer Note", action_plan: "Action Plan", weekly_reflection: "Weekly Reflection",
+};
+
+async function loadWeeklyQuestions() {
+  const qs = await api("/journal/questions/weekly");
+  document.getElementById("weekly-questions").innerHTML = qs.map(q => `• ${q}`).join("<br>");
+}
+
+async function submitEntry(entryType, textareaId) {
+  const content = document.getElementById(textareaId).value.trim();
+  if (!content) return;
+  await api("/journal", { method: "POST", body: JSON.stringify({ entry_type: entryType, content }) });
+  document.getElementById(textareaId).value = "";
+  loadEntries();
+}
+
+let currentModalType = "reflection";
+let editingEntryId = null;
+document.getElementById("entryModal").addEventListener("show.bs.modal", (e) => {
+  if (editingEntryId) return; // opened programmatically by editEntry(), don't reset
+  currentModalType = e.relatedTarget.dataset.type;
+  document.getElementById("entry-modal-title").textContent = `New ${typeLabels[currentModalType]}`;
+  document.getElementById("modal-entry-content").value = "";
+});
+document.getElementById("modal-save-btn").addEventListener("click", async () => {
+  if (editingEntryId) {
+    const content = document.getElementById("modal-entry-content").value.trim();
+    if (content) await api(`/journal/${editingEntryId}`, { method: "PUT", body: JSON.stringify({ content }) });
+    editingEntryId = null;
+    loadEntries();
+  } else {
+    await submitEntry(currentModalType, "modal-entry-content");
+  }
+  bootstrap.Modal.getInstance(document.getElementById("entryModal")).hide();
+});
+
+function editEntry(id, content) {
+  editingEntryId = id;
+  document.getElementById("entry-modal-title").textContent = "Edit Entry";
+  document.getElementById("modal-entry-content").value = content;
+  new bootstrap.Modal(document.getElementById("entryModal")).show();
+}
+document.getElementById("entryModal").addEventListener("hidden.bs.modal", () => { editingEntryId = null; });
+
+async function loadEntries() {
+  const filter = document.getElementById("filter-type").value;
+  const keyword = document.getElementById("filter-keyword").value.trim();
+  const params = new URLSearchParams();
+  if (filter) params.append("entry_type", filter);
+  if (keyword) params.append("keyword", keyword);
+  const entries = await api(`/journal?${params.toString()}`);
+  const el = document.getElementById("entries-list");
+  if (!entries.length) { el.innerHTML = `<p class="text-muted">No entries found.</p>`; return; }
+  el.innerHTML = entries.map(e => `
+    <div class="card card-rc p-3 mb-2" data-entry-id="${e.id}">
+      <div class="d-flex justify-content-between">
+        <span class="category-pill">${typeLabels[e.entry_type] || e.entry_type}</span>
+        <div>
+          <span class="text-muted small me-2">${timeAgo(e.created_at)}${e.updated_at ? " (edited)" : ""}</span>
+          <button class="btn btn-sm btn-link p-0 me-2 entry-edit-btn" data-id="${e.id}">Edit</button>
+          <button class="btn btn-sm btn-link text-danger p-0" onclick="deleteEntry(${e.id})">✕</button>
+        </div>
+      </div>
+      <p class="mb-0 mt-2">${escapeHtml(e.content)}</p>
+    </div>
+  `).join("");
+  el.querySelectorAll(".entry-edit-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = parseInt(btn.dataset.id);
+      const entry = entries.find(e => e.id === id);
+      if (entry) editEntry(id, entry.content);
+    });
+  });
+}
+
+async function deleteEntry(id) {
+  if (!confirm("Delete this journal entry?")) return;
+  await api(`/journal/${id}`, { method: "DELETE" });
+  loadEntries();
+}
+
+loadWeeklyQuestions();
+loadEntries();
+</script>
+</body>
+</html>

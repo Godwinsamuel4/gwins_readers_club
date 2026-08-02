@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Training Group — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <a href="training-groups.html" class="small">&larr; Back to Training Groups</a>
+  <div id="group-detail" class="mt-3">Loading...</div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-md-5">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Members</h6>
+          <button class="btn btn-sm btn-rc" id="add-member-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#memberModal">+ Add</button>
+        </div>
+        <div id="members-list" class="mt-2">Loading...</div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Sessions</h6>
+          <button class="btn btn-sm btn-rc" id="add-session-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#sessionModal">+ Add Session</button>
+        </div>
+        <p class="text-muted small mb-2">Add as many sessions as you need — each one gets its own attendance, materials, and breakout groups.</p>
+        <div id="sessions-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add member modal -->
+<div class="modal fade" id="memberModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add a Member</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="member-alert"></div>
+        <label class="form-label">Search by name or email</label>
+        <input class="form-control" id="member-search" placeholder="Type to search...">
+        <div id="member-search-results" class="mt-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/edit session modal -->
+<div class="modal fade" id="sessionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="session-modal-title">Add Session</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="session-alert"></div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="s_title"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="s_description" rows="2"></textarea></div>
+        <div class="row g-2">
+          <div class="col-md-7"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-control" id="s_date"></div>
+          <div class="col-md-5"><label class="form-label">Duration (min)</label><input type="number" class="form-control" id="s_duration" value="60"></div>
+        </div>
+        <div class="mb-2 mt-2"><label class="form-label">Location <small class="text-muted">(room, or a video-call link)</small></label><input class="form-control" id="s_location"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" id="session-submit-btn" onclick="submitSession()">Add Session</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Session detail modal: attendance / materials / breakouts -->
+<div class="modal fade" id="sessionDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="sd-title">Session</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs" id="sd-tabs">
+          <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#sd-attendance">Attendance</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sd-materials">Materials</button></li>
+          <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sd-breakouts">Breakout Groups</button></li>
+        </ul>
+        <div class="tab-content pt-3">
+          <div class="tab-pane fade show active" id="sd-attendance">
+            <div id="sd-attendance-list">Loading...</div>
+          </div>
+          <div class="tab-pane fade" id="sd-materials">
+            <div id="sd-materials-form" class="border-bottom pb-3 mb-3">
+              <div class="row g-2">
+                <div class="col-md-4"><input class="form-control form-control-sm" id="mat-title" placeholder="Title"></div>
+                <div class="col-md-4"><input class="form-control form-control-sm" id="mat-url" placeholder="Link (optional)"></div>
+                <div class="col-md-3"><input type="file" class="form-control form-control-sm" id="mat-file"></div>
+                <div class="col-md-1"><button class="btn btn-rc btn-sm w-100" onclick="addMaterial()">Add</button></div>
+              </div>
+              <div id="material-alert" class="mt-1"></div>
+            </div>
+            <div id="sd-materials-list">Loading...</div>
+          </div>
+          <div class="tab-pane fade" id="sd-breakouts">
+            <div id="sd-breakouts-form" class="border-bottom pb-3 mb-3">
+              <div class="row g-2">
+                <div class="col-md-4"><input class="form-control form-control-sm" id="bo-name" placeholder="Group name (e.g. Team A)"></div>
+                <div class="col-md-6"><input class="form-control form-control-sm" id="bo-notes" placeholder="Task/instructions (optional)"></div>
+                <div class="col-md-2"><button class="btn btn-rc btn-sm w-100" onclick="createBreakout()">Create</button></div>
+              </div>
+            </div>
+            <div id="sd-breakouts-list">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("training-groups");
+const params = new URLSearchParams(window.location.search);
+const groupId = params.get("id");
+const user = getUser();
+let canManage = false;
+let currentSessionId = null;
+let groupMembersCache = [];
+
+async function loadGroup() {
+  const g = await api(`/training-groups/${groupId}`);
+  canManage = g.is_trainer || ["admin", "moderator"].includes(user.role);
+  document.getElementById("group-detail").innerHTML = `
+    <div class="card card-rc p-4">
+      <div class="d-flex justify-content-between">
+        <div>
+          <h3 class="mb-0">${escapeHtml(g.name)}</h3>
+          ${g.focus_area ? `<div class="text-muted small">${escapeHtml(g.focus_area)}</div>` : ""}
+        </div>
+        ${canManage ? `
+          <div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="editGroup()">Edit</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteGroup()">Delete</button>
+          </div>` : ""}
+      </div>
+      <p class="mt-2 mb-0">${escapeHtml(g.description || "")}</p>
+      <div class="text-muted small mt-2">${g.member_count} member${g.member_count === 1 ? "" : "s"} &middot; ${g.session_count} session${g.session_count === 1 ? "" : "s"}</div>
+    </div>
+  `;
+  document.getElementById("add-member-btn").style.display = canManage ? "inline-block" : "none";
+  document.getElementById("add-session-btn").style.display = canManage ? "inline-block" : "none";
+  window.currentGroup = g;
+}
+
+async function editGroup() {
+  const g = window.currentGroup;
+  const name = prompt("Group name:", g.name);
+  if (name === null) return;
+  const focus_area = prompt("Focus area:", g.focus_area || "");
+  const description = prompt("Description:", g.description || "");
+  await api(`/training-groups/${groupId}`, { method: "PUT", body: JSON.stringify({ name, focus_area, description }) });
+  loadGroup();
+}
+
+async function deleteGroup() {
+  if (!confirm("Delete this training group permanently? This removes all members, sessions, materials, and breakout groups.")) return;
+  await api(`/training-groups/${groupId}`, { method: "DELETE" });
+  window.location.href = "training-groups.html";
+}
+
+async function loadMembers() {
+  const members = await api(`/training-groups/${groupId}/members`);
+  groupMembersCache = members;
+  const el = document.getElementById("members-list");
+  if (!members.length) { el.innerHTML = `<p class="text-muted small mb-0">No members yet.</p>`; return; }
+  el.innerHTML = members.map(m => `
+    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+      <span class="small">${escapeHtml(m.name)}</span>
+      <div>
+        ${m.is_trainer ? '<span class="badge bg-warning text-dark">Trainer</span>' : ""}
+        ${canManage ? `<button class="btn btn-sm btn-link text-danger p-0 ms-2" onclick="removeMember(${m.user_id})">Remove</button>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
+async function removeMember(userId) {
+  if (!confirm("Remove this member from the group?")) return;
+  await api(`/training-groups/${groupId}/members/${userId}`, { method: "DELETE" });
+  loadMembers();
+  loadGroup();
+}
+
+let searchDebounce = null;
+document.getElementById("member-search").addEventListener("input", (e) => {
+  clearTimeout(searchDebounce);
+  const q = e.target.value.trim();
+  searchDebounce = setTimeout(() => runMemberSearch(q), 250);
+});
+
+async function runMemberSearch(q) {
+  const box = document.getElementById("member-search-results");
+  if (!q) { box.innerHTML = ""; return; }
+  const results = await api(`/training-groups/search-users?q=${encodeURIComponent(q)}`);
+  const memberIds = new Set(groupMembersCache.map(m => m.user_id));
+  box.innerHTML = results.map(u => `
+    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+      <span class="small">${escapeHtml(u.full_name)} <span class="text-muted">(${escapeHtml(u.role)})</span></span>
+      ${memberIds.has(u.id)
+        ? `<span class="small text-muted">Already added</span>`
+        : `<button class="btn btn-sm btn-outline-secondary" onclick="addMember(${u.id})">Add</button>`}
+    </div>
+  `).join("") || `<p class="text-muted small">No matches.</p>`;
+}
+
+async function addMember(userId) {
+  try {
+    await api(`/training-groups/${groupId}/members/${userId}`, { method: "POST" });
+    showAlert("member-alert", "Member added.", "success");
+    document.getElementById("member-search").value = "";
+    document.getElementById("member-search-results").innerHTML = "";
+    loadMembers();
+    loadGroup();
+  } catch (err) {
+    showAlert("member-alert", err.message);
+  }
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+async function loadSessions() {
+  const sessions = await api(`/training-groups/${groupId}/sessions`);
+  const el = document.getElementById("sessions-list");
+  if (!sessions.length) { el.innerHTML = `<p class="text-muted small mb-0">No sessions scheduled yet.</p>`; return; }
+  el.innerHTML = sessions.map(s => `
+    <div class="border-bottom py-2 ${s.is_cancelled ? "text-muted" : ""}">
+      <div class="d-flex justify-content-between">
+        <strong class="small">${escapeHtml(s.title)} ${s.is_cancelled ? '<span class="badge bg-secondary">Cancelled</span>' : ""}</strong>
+        ${canManage && !s.is_cancelled ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="cancelSession(${s.id})">Cancel</button>` : ""}
+      </div>
+      <div class="text-muted small">${fmtDate(s.session_date)} &middot; ${s.duration_minutes} min${s.location ? " &middot; " + escapeHtml(s.location) : ""}</div>
+      <div class="small">${escapeHtml(s.description || "")}</div>
+      <div class="small text-muted mt-1">${s.present_count} present &middot; ${s.resource_count} material${s.resource_count === 1 ? "" : "s"} &middot; ${s.breakout_count} breakout group${s.breakout_count === 1 ? "" : "s"}</div>
+      <button class="btn btn-sm btn-outline-secondary mt-1" onclick="openSessionDetail(${s.id}, ${JSON.stringify(s.title).replace(/"/g, "&quot;")})">Manage</button>
+    </div>
+  `).join("");
+}
+
+async function submitSession() {
+  const dateVal = document.getElementById("s_date").value;
+  if (!dateVal) { showAlert("session-alert", "Pick a date and time."); return; }
+  const payload = {
+    title: document.getElementById("s_title").value,
+    description: document.getElementById("s_description").value || null,
+    session_date: new Date(dateVal).toISOString(),
+    duration_minutes: parseInt(document.getElementById("s_duration").value || "60", 10),
+    location: document.getElementById("s_location").value || null,
+  };
+  try {
+    await api(`/training-groups/${groupId}/sessions`, { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("sessionModal")).hide();
+    ["s_title","s_description","s_date","s_location"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("s_duration").value = 60;
+    loadSessions();
+    loadGroup();
+  } catch (err) {
+    showAlert("session-alert", err.message);
+  }
+}
+
+async function cancelSession(sessionId) {
+  if (!confirm("Cancel this session?")) return;
+  await api(`/training-groups/sessions/${sessionId}`, { method: "DELETE" });
+  loadSessions();
+}
+
+// ---- Session detail: attendance / materials / breakouts ----
+
+function openSessionDetail(sessionId, title) {
+  currentSessionId = sessionId;
+  document.getElementById("sd-title").textContent = title;
+  loadAttendanceTab();
+  loadMaterialsTab();
+  loadBreakoutsTab();
+  bootstrap.Modal.getOrCreateInstance(document.getElementById("sessionDetailModal")).show();
+}
+
+async function loadAttendanceTab() {
+  const el = document.getElementById("sd-attendance-list");
+  el.innerHTML = "Loading...";
+  const [members, records] = await Promise.all([
+    api(`/training-groups/${groupId}/members`),
+    api(`/training-groups/sessions/${currentSessionId}/attendance`),
+  ]);
+  const statusByUser = Object.fromEntries(records.map(r => [r.user_id, r.status]));
+  el.innerHTML = members.filter(m => !m.is_trainer).map(m => {
+    const status = statusByUser[m.user_id] || "";
+    return `
+      <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+        <span class="small">${escapeHtml(m.name)}</span>
+        <div class="btn-group btn-group-sm">
+          ${["present","absent","excused"].map(st => `
+            <button class="btn btn-sm ${status === st ? "btn-rc" : "btn-outline-secondary"}" ${canManage ? "" : "disabled"}
+              onclick="markAttendance(${m.user_id}, '${st}')">${st}</button>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }).join("") || `<p class="text-muted small">No trainees in this group yet.</p>`;
+}
+
+async function markAttendance(userId, status) {
+  await api(`/training-groups/sessions/${currentSessionId}/attendance`, {
+    method: "POST", body: JSON.stringify({ user_id: userId, status }),
+  });
+  loadAttendanceTab();
+}
+
+async function loadMaterialsTab() {
+  document.getElementById("sd-materials-form").style.display = canManage ? "block" : "none";
+  const el = document.getElementById("sd-materials-list");
+  el.innerHTML = "Loading...";
+  const resources = await api(`/training-groups/sessions/${currentSessionId}/resources`);
+  el.innerHTML = resources.map(r => `
+    <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+      <span class="small">
+        ${r.file_url ? `<a href="${r.file_url}" target="_blank">📎 ${escapeHtml(r.title)}</a>` : (r.url ? `<a href="${r.url}" target="_blank" rel="noopener">🔗 ${escapeHtml(r.title)}</a>` : escapeHtml(r.title))}
+      </span>
+      ${canManage ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="deleteMaterial(${r.id})">Remove</button>` : ""}
+    </div>
+  `).join("") || `<p class="text-muted small">No materials added yet.</p>`;
+}
+
+async function addMaterial() {
+  const title = document.getElementById("mat-title").value.trim();
+  const url = document.getElementById("mat-url").value.trim();
+  const file = document.getElementById("mat-file").files[0];
+  if (!title) { showAlert("material-alert", "Give the material a title."); return; }
+  if (!file && !url) { showAlert("material-alert", "Attach a file or a link."); return; }
+  const fd = new FormData();
+  fd.append("title", title);
+  if (url) fd.append("url", url);
+  if (file) fd.append("file", file);
+  try {
+    await apiUpload(`/training-groups/sessions/${currentSessionId}/resources`, fd);
+    document.getElementById("mat-title").value = "";
+    document.getElementById("mat-url").value = "";
+    document.getElementById("mat-file").value = "";
+    loadMaterialsTab();
+    loadSessions();
+  } catch (err) {
+    showAlert("material-alert", err.message);
+  }
+}
+
+async function deleteMaterial(resourceId) {
+  if (!confirm("Remove this material?")) return;
+  await api(`/training-groups/resources/${resourceId}`, { method: "DELETE" });
+  loadMaterialsTab();
+  loadSessions();
+}
+
+async function loadBreakoutsTab() {
+  document.getElementById("sd-breakouts-form").style.display = canManage ? "block" : "none";
+  const el = document.getElementById("sd-breakouts-list");
+  el.innerHTML = "Loading...";
+  const breakouts = await api(`/training-groups/sessions/${currentSessionId}/breakouts`);
+  const members = groupMembersCache.length ? groupMembersCache : await api(`/training-groups/${groupId}/members`);
+  const trainees = members.filter(m => !m.is_trainer);
+  el.innerHTML = breakouts.map(b => `
+    <div class="border rounded p-2 mb-2">
+      <div class="d-flex justify-content-between">
+        <strong class="small">${escapeHtml(b.name)}</strong>
+        ${canManage ? `<button class="btn btn-sm btn-link text-danger p-0" onclick="deleteBreakout(${b.id})">Delete</button>` : ""}
+      </div>
+      ${b.notes ? `<div class="small text-muted">${escapeHtml(b.notes)}</div>` : ""}
+      <div class="small mt-1">${b.members.map(m => escapeHtml(m.name)).join(", ") || "No members assigned"}</div>
+      ${canManage ? `
+        <select class="form-select form-select-sm mt-1" onchange="if(this.value){assignToBreakout(${b.id}, this.value); this.value='';}">
+          <option value="">+ Assign trainee...</option>
+          ${trainees.filter(t => !b.members.some(bm => bm.user_id === t.user_id)).map(t => `<option value="${t.user_id}">${escapeHtml(t.name)}</option>`).join("")}
+        </select>
+        ${b.members.length ? `<div class="mt-1">${b.members.map(m => `<span class="badge bg-light text-dark border me-1">${escapeHtml(m.name)} <a href="#" class="text-danger text-decoration-none" onclick="event.preventDefault(); removeFromBreakout(${b.id}, ${m.user_id})">&times;</a></span>`).join("")}</div>` : ""}` : ""}
+    </div>
+  `).join("") || `<p class="text-muted small">No breakout groups for this session yet.</p>`;
+}
+
+async function createBreakout() {
+  const name = document.getElementById("bo-name").value.trim();
+  const notes = document.getElementById("bo-notes").value.trim();
+  if (!name) return;
+  await api(`/training-groups/sessions/${currentSessionId}/breakouts`, {
+    method: "POST", body: JSON.stringify({ name, notes: notes || null, member_ids: [] }),
+  });
+  document.getElementById("bo-name").value = "";
+  document.getElementById("bo-notes").value = "";
+  loadBreakoutsTab();
+  loadSessions();
+}
+
+async function deleteBreakout(breakoutId) {
+  if (!confirm("Delete this breakout group?")) return;
+  await api(`/training-groups/breakouts/${breakoutId}`, { method: "DELETE" });
+  loadBreakoutsTab();
+  loadSessions();
+}
+
+async function assignToBreakout(breakoutId, userId) {
+  await api(`/training-groups/breakouts/${breakoutId}/members/${userId}`, { method: "POST" });
+  loadBreakoutsTab();
+}
+
+async function removeFromBreakout(breakoutId, userId) {
+  await api(`/training-groups/breakouts/${breakoutId}/members/${userId}`, { method: "DELETE" });
+  loadBreakoutsTab();
+}
+
+loadGroup().then(loadMembers);
+loadSessions();
+</script>
+</body>
+</html>

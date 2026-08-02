@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Live Discussions — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+<style>
+  .status-pill { border-radius: 20px; padding: 2px 10px; font-size: 0.72rem; font-weight: 600; }
+  .status-live { background: #dc3545; color: #fff; }
+  .status-upcoming { background: #e6e0f2; color: var(--rc-purple); }
+  .status-ended { background: #e2e2e2; color: #555; }
+  .featured-ribbon { background: var(--rc-gold); color: var(--rc-navy); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h3>🎙️ Live Discussions</h3>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" id="host-stats-btn" style="display:none;" onclick="showHostStats()">My Hosted Sessions</button>
+      <button class="btn btn-rc btn-sm" id="new-session-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#sessionModal">+ Schedule Session</button>
+    </div>
+  </div>
+  <p class="text-muted small">Live chat rooms for webinars, author interviews, and group discussions. Messages refresh automatically. Sessions auto-flip between Upcoming → Live → Ended.</p>
+
+  <div class="card card-rc p-3 mb-3">
+    <div class="row g-2">
+      <div class="col-md-4"><input class="form-control form-control-sm" id="f-query" placeholder="Search by title..." onkeydown="if(event.key==='Enter')loadSessions()"></div>
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" id="f-type" onchange="loadSessions()">
+          <option value="">All types</option>
+          <option value="live_chat">Live Chat</option>
+          <option value="audio">Audio Discussion</option>
+          <option value="webinar">Webinar</option>
+          <option value="author_interview">Author Interview</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select form-select-sm" id="f-when" onchange="loadSessions()">
+          <option value="all">Upcoming & Live & Ended</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="live">Live now</option>
+          <option value="ended">Ended</option>
+        </select>
+      </div>
+      <div class="col-md-2"><input class="form-control form-control-sm" id="f-category" placeholder="Category" onkeydown="if(event.key==='Enter')loadSessions()"></div>
+      <div class="col-md-2"><button class="btn btn-rc btn-sm w-100" onclick="loadSessions()">Filter</button></div>
+    </div>
+  </div>
+
+  <div class="row g-4" id="sessions-grid">Loading...</div>
+</div>
+
+<div class="modal fade" id="sessionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Schedule a Live Session</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="session-alert"></div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="s_title"></div>
+        <div class="mb-2">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="s_type">
+            <option value="live_chat">Live Chat</option>
+            <option value="audio">Audio Discussion</option>
+            <option value="webinar">Webinar</option>
+            <option value="author_interview">Author Interview</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="s_description" rows="2"></textarea></div>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-control" id="s_scheduled"></div>
+          <div class="col-6"><label class="form-label">Duration (minutes)</label><input type="number" class="form-control" id="s_duration" value="60"></div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-6"><label class="form-label">Category / topic</label><input class="form-control" id="s_category" placeholder="e.g. African Literature"></div>
+          <div class="col-6"><label class="form-label">Recurrence</label>
+            <select class="form-select" id="s_recurrence">
+              <option value="">One-off</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-2 mt-1">
+          <div class="col-6"><label class="form-label">Max capacity (blank = unlimited)</label><input type="number" class="form-control" id="s_capacity"></div>
+          <div class="col-6"><label class="form-label">Slow mode (seconds between msgs)</label><input type="number" class="form-control" id="s_slowmode" value="0"></div>
+        </div>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="s_announcement_only">
+          <label class="form-check-label small" for="s_announcement_only">Announcement-only mode (only host/co-hosts can post in chat)</label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="s_attendee_public" checked>
+          <label class="form-check-label small" for="s_attendee_public">Make attendee list public</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitSession()">Schedule</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="hostStatsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">My Hosted Sessions</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body" id="host-stats-body">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("live");
+const user = getUser();
+if (["admin", "mentor"].includes(user.role)) {
+  document.getElementById("new-session-btn").style.display = "inline-block";
+}
+if (["admin", "mentor", "moderator"].includes(user.role)) {
+  document.getElementById("host-stats-btn").style.display = "inline-block";
+}
+
+const typeIcons = { live_chat: "💬", audio: "🎧", webinar: "🖥️", author_interview: "✍️" };
+const statusLabels = { upcoming: "Upcoming", live: "🔴 Live now", ended: "Ended" };
+
+async function loadSessions() {
+  const q = document.getElementById("f-query").value.trim();
+  const type = document.getElementById("f-type").value;
+  const when = document.getElementById("f-when").value;
+  const category = document.getElementById("f-category").value.trim();
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (type) params.set("session_type", type);
+  if (when) params.set("when", when);
+  if (category) params.set("category", category);
+
+  const sessions = await api(`/live/sessions/search?${params.toString()}`);
+  const grid = document.getElementById("sessions-grid");
+  if (!sessions.length) { grid.innerHTML = `<p class="text-muted">No sessions match your filters.</p>`; return; }
+  grid.innerHTML = sessions.map(s => {
+    const when = new Date(s.scheduled_at);
+    const isHost = s.host_id === user.id || ["admin", "moderator"].includes(user.role);
+    const capacityText = s.max_capacity ? `${s.rsvp_count}/${s.max_capacity} attending${s.waitlist_count ? ` · ${s.waitlist_count} waitlisted` : ""}` : `${s.rsvp_count} attending`;
+    return `
+      <div class="col-md-4">
+        <div class="card card-rc h-100 p-3 ${s.is_cancelled ? "opacity-50" : ""}">
+          ${s.is_featured ? `<div class="featured-ribbon small text-center rounded mb-2 py-1">⭐ Featured</div>` : ""}
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="category-pill mb-2" style="width:fit-content;">${typeIcons[s.session_type] || "💬"} ${s.session_type.replace("_"," ")}</div>
+            <span class="status-pill status-${s.status}">${s.is_cancelled ? "Cancelled" : (statusLabels[s.status] || s.status)}</span>
+          </div>
+          <h5>${escapeHtml(s.title)}</h5>
+          <div class="text-muted small mb-1">${when.toLocaleString()} · ${s.duration_minutes} min ${s.host_name ? "· hosted by " + escapeHtml(s.host_name) : ""}</div>
+          ${s.category ? `<div class="small text-muted mb-1">🏷️ ${escapeHtml(s.category)}${s.book_title ? " · 📖 " + escapeHtml(s.book_title) : ""}</div>` : ""}
+          ${s.recurrence ? `<div class="small text-muted mb-1">🔁 Repeats ${s.recurrence}</div>` : ""}
+          <p class="small">${escapeHtml(s.description || "")}</p>
+          ${s.status === "live" ? `<div class="small text-danger mb-1">👀 ${s.viewer_count} watching now</div>` : ""}
+          ${s.average_rating ? `<div class="small mb-1">⭐ ${s.average_rating} (${s.rating_count} rating${s.rating_count === 1 ? "" : "s"})</div>` : ""}
+          ${!s.is_cancelled && s.status !== "ended" ? `
+            <button class="btn btn-sm ${s.is_attending ? "btn-rc" : "btn-outline-secondary"} mb-2" style="width:fit-content;" onclick="toggleSessionRsvp(${s.id}, ${s.is_attending})">
+              ${s.is_attending ? "✓ Going" : (s.is_waitlisted ? "⏳ Waitlisted" : "RSVP")} (${capacityText})
+            </button>` : ""}
+          <div class="d-flex gap-2 mt-auto flex-wrap">
+            ${!s.is_cancelled ? `
+              <a href="live-session.html?id=${s.id}" class="btn btn-sm ${s.status === "ended" ? "btn-outline-secondary" : "btn-rc-gold"}" style="width:fit-content;">
+                ${s.status === "ended" ? "View Replay Chat" : "Join Session"}
+              </a>` : ""}
+            <a href="/api/live/sessions/${s.id}/ics" class="btn btn-sm btn-outline-secondary" title="Add to calendar">📅 .ics</a>
+            ${isHost && !s.is_cancelled ? `<button class="btn btn-sm btn-outline-danger" onclick="cancelSession(${s.id})">Cancel</button>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function toggleSessionRsvp(sessionId, isAttending) {
+  const r = await api(`/live/sessions/${sessionId}/rsvp`, { method: isAttending ? "DELETE" : "POST" });
+  if (r && r.waitlisted) alert("This session is full — you've been added to the waitlist and will be notified if a spot opens up.");
+  loadSessions();
+}
+
+async function cancelSession(sessionId) {
+  if (!confirm("Cancel this session?")) return;
+  await api(`/live/sessions/${sessionId}`, { method: "DELETE" });
+  loadSessions();
+}
+
+async function submitSession() {
+  const capacity = document.getElementById("s_capacity").value;
+  const payload = {
+    title: document.getElementById("s_title").value,
+    session_type: document.getElementById("s_type").value,
+    description: document.getElementById("s_description").value,
+    scheduled_at: new Date(document.getElementById("s_scheduled").value).toISOString(),
+    duration_minutes: parseInt(document.getElementById("s_duration").value) || 60,
+    category: document.getElementById("s_category").value || null,
+    recurrence: document.getElementById("s_recurrence").value || null,
+    max_capacity: capacity ? parseInt(capacity) : null,
+    slow_mode_seconds: parseInt(document.getElementById("s_slowmode").value) || 0,
+    announcement_only: document.getElementById("s_announcement_only").checked,
+    attendee_list_public: document.getElementById("s_attendee_public").checked,
+  };
+  try {
+    await api("/live/sessions", { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("sessionModal")).hide();
+    loadSessions();
+  } catch (err) {
+    showAlert("session-alert", err.message);
+  }
+}
+
+async function showHostStats() {
+  const modal = new bootstrap.Modal(document.getElementById("hostStatsModal"));
+  modal.show();
+  const body = document.getElementById("host-stats-body");
+  body.innerHTML = "Loading...";
+  try {
+    const stats = await api("/live/my-sessions/stats");
+    if (!stats.length) { body.innerHTML = `<p class="text-muted">You haven't hosted any sessions yet.</p>`; return; }
+    body.innerHTML = `
+      <table class="table table-sm">
+        <thead><tr><th>Title</th><th>When</th><th>Status</th><th>RSVPs</th><th>Messages</th><th>Rating</th></tr></thead>
+        <tbody>
+          ${stats.map(s => `
+            <tr>
+              <td><a href="live-session.html?id=${s.id}">${escapeHtml(s.title)}</a></td>
+              <td class="small">${new Date(s.scheduled_at).toLocaleDateString()}</td>
+              <td><span class="status-pill status-${s.status}">${statusLabels[s.status] || s.status}</span></td>
+              <td>${s.rsvp_count}</td>
+              <td>${s.message_count}</td>
+              <td>${s.average_rating ? `⭐ ${s.average_rating} (${s.rating_count})` : "—"}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    body.innerHTML = `<p class="text-danger">${err.message}</p>`;
+  }
+}
+
+loadSessions();
+setInterval(loadSessions, 20000);
+</script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Progress — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 class="mb-4">📈 My Reading Progress</h3>
+
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="card card-rc p-3 text-center">
+        <div class="streak-badge" id="streak-num">0</div>
+        <div class="mt-2 fw-bold">Current Streak</div>
+        <div class="text-muted small" id="longest-streak"></div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card card-rc p-3 h-100">
+        <h6>🏆 Reading Challenges</h6>
+        <div id="challenges-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between">
+          <h6>🎯 Reading Goals</h6>
+          <button class="btn btn-sm btn-rc" data-bs-toggle="modal" data-bs-target="#goalModal">+ New Goal</button>
+        </div>
+        <div id="goals-list">Loading...</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <h6>🎓 Certificates</h6>
+        <div id="certificates-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <h6>🏅 Leaderboard</h6>
+        <div id="leaderboard-list">Loading...</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card card-rc p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <h6>📜 Reading History</h6>
+          <button class="btn btn-sm btn-outline-secondary" onclick="exportHistoryCsv()">Export CSV</button>
+        </div>
+        <div id="history-list">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="goalModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Set a Reading Goal</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <label class="form-label">Goal Type</label>
+          <select class="form-select" id="goal_type">
+            <option value="monthly">Monthly</option>
+            <option value="annual">Annual</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Target number of books</label>
+          <input type="number" min="1" class="form-control" id="target_books" value="1">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="createGoal()">Save Goal</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("progress");
+
+async function loadStreak() {
+  const s = await api("/progress/streak");
+  document.getElementById("streak-num").textContent = s.current_streak;
+  document.getElementById("longest-streak").textContent = `Longest: ${s.longest_streak} days`;
+}
+
+async function loadChallenges() {
+  const challenges = await api("/progress/challenges");
+  const el = document.getElementById("challenges-list");
+  if (!challenges.length) { el.innerHTML = `<p class="text-muted small mb-0">No active challenges right now.</p>`; return; }
+  for (const c of challenges) {
+    const status = await api(`/progress/challenges/${c.id}/my-status`);
+    const row = document.createElement("div");
+    row.className = "d-flex justify-content-between align-items-center border-bottom py-2";
+    row.innerHTML = `
+      <div>
+        <strong>${escapeHtml(c.name)}</strong>
+        <div class="text-muted small">${escapeHtml(c.description || "")} · ${c.start_date} to ${c.end_date} · ${c.participant_count} joined</div>
+      </div>
+      ${status.joined
+        ? `<span class="badge bg-success">Joined</span>`
+        : `<button class="btn btn-sm btn-rc-gold" onclick="joinChallenge(${c.id})">Join</button>`}
+    `;
+    el.appendChild(row);
+  }
+  if (el.innerHTML === "") el.innerHTML = `<p class="text-muted small mb-0">No active challenges right now.</p>`;
+}
+
+async function joinChallenge(id) {
+  await api(`/progress/challenges/${id}/join`, { method: "POST" });
+  document.getElementById("challenges-list").innerHTML = "Loading...";
+  loadChallenges();
+}
+
+async function loadGoals() {
+  const goals = await api("/progress/goals");
+  const el = document.getElementById("goals-list");
+  if (!goals.length) { el.innerHTML = `<p class="text-muted small mb-0">No goals set yet.</p>`; return; }
+  el.innerHTML = goals.map(g => {
+    const pct = Math.min(100, Math.round((g.books_completed / g.target_books) * 100));
+    return `
+      <div class="mb-3">
+        <div class="d-flex justify-content-between small">
+          <span>${g.goal_type === "monthly" ? "Monthly" : "Annual"} Goal (${g.year}${g.month ? "-" + g.month : ""})</span>
+          <span>${g.books_completed}/${g.target_books} books</span>
+        </div>
+        <div class="progress" style="height:8px;">
+          <div class="progress-bar" style="width:${pct}%; background: var(--rc-purple);"></div>
+        </div>
+        <button class="btn btn-sm btn-link p-0 mt-1" onclick="editGoal(${g.id}, ${g.target_books})">Edit target</button>
+        <button class="btn btn-sm btn-link text-danger p-0 mt-1 ms-2" onclick="deleteGoal(${g.id})">Remove goal</button>
+      </div>`;
+  }).join("");
+}
+
+async function editGoal(id, currentTarget) {
+  const target = prompt("New target number of books:", currentTarget);
+  if (!target || isNaN(target) || parseInt(target) < 1) { if (target !== null) alert("Enter a valid number"); return; }
+  await api(`/progress/goals/${id}`, { method: "PUT", body: JSON.stringify({ target_books: parseInt(target) }) });
+  loadGoals();
+}
+
+async function deleteGoal(id) {
+  await api(`/progress/goals/${id}`, { method: "DELETE" });
+  loadGoals();
+}
+
+async function createGoal() {
+  const goal_type = document.getElementById("goal_type").value;
+  const target_books = parseInt(document.getElementById("target_books").value);
+  const now = new Date();
+  const payload = {
+    goal_type, target_books, year: now.getFullYear(),
+    month: goal_type === "monthly" ? now.getMonth() + 1 : null,
+  };
+  await api("/progress/goals", { method: "POST", body: JSON.stringify(payload) });
+  bootstrap.Modal.getInstance(document.getElementById("goalModal")).hide();
+  loadGoals();
+}
+
+async function loadCertificates() {
+  const certs = await api("/certificates");
+  const el = document.getElementById("certificates-list");
+  if (!certs.length) { el.innerHTML = `<p class="text-muted small mb-0">Complete books and challenges to earn certificates.</p>`; return; }
+  el.innerHTML = certs.map(c => `
+    <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+      <div>
+        <strong class="small">${escapeHtml(c.title)}</strong> ${c.revoked ? '<span class="badge bg-secondary">Revoked</span>' : ""}
+        <div class="text-muted small">Issued ${new Date(c.issued_at).toLocaleDateString()}${c.revoked_reason ? " — " + escapeHtml(c.revoked_reason) : ""}</div>
+      </div>
+      <button class="btn btn-sm btn-outline-secondary" ${c.revoked ? "disabled" : ""} onclick="downloadCertificate(${c.id})">Download PDF</button>
+    </div>
+  `).join("");
+}
+
+loadStreak();
+loadChallenges();
+loadGoals();
+loadCertificates();
+loadLeaderboard();
+loadHistory();
+
+async function loadLeaderboard() {
+  const entries = await api("/progress/leaderboard?limit=10");
+  const el = document.getElementById("leaderboard-list");
+  const user = getUser();
+  if (!entries.length) { el.innerHTML = `<p class="text-muted small mb-0">No readers ranked yet.</p>`; return; }
+  el.innerHTML = entries.map((e, i) => `
+    <div class="d-flex justify-content-between border-bottom py-1 ${e.user_id === user.id ? "fw-bold" : ""}">
+      <span class="small">${i+1}. ${escapeHtml(e.full_name)}</span>
+      <span class="small text-muted">${e.books_completed} books · ${e.current_streak}d streak</span>
+    </div>
+  `).join("");
+}
+
+async function loadHistory() {
+  const history = await api("/progress/history");
+  const el = document.getElementById("history-list");
+  if (!history.length) { el.innerHTML = `<p class="text-muted small mb-0">No books completed yet.</p>`; return; }
+  el.innerHTML = history.slice(0, 8).map(h => `
+    <div class="d-flex justify-content-between border-bottom py-1">
+      <a href="book.html?id=${h.book_id}" class="small text-decoration-none">${h.book_title}</a>
+      <span class="text-muted small">${h.date ? new Date(h.date).toLocaleDateString() : ""}</span>
+    </div>
+  `).join("");
+}
+
+async function exportHistoryCsv() {
+  const res = await fetch("/api/progress/history/export", {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "reading_history.csv";
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+async function downloadCertificate(certId) {
+  const res = await fetch(`/api/certificates/${certId}/download`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ReadersClub_Certificate_${certId}.pdf`;
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Training Groups — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h3>🎯 Training Groups</h3>
+    <button class="btn btn-rc btn-sm" id="new-group-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#groupModal">+ New Training Group</button>
+  </div>
+  <p class="text-muted small">Focused, curated cohorts pulled together for specific training — public speaking, debate, exam prep, and more. Separate from Reading Club membership; a trainer adds who belongs.</p>
+
+  <div class="row g-4" id="groups-grid">Loading...</div>
+</div>
+
+<div class="modal fade" id="groupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">New Training Group</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="group-alert"></div>
+        <div class="mb-2"><label class="form-label">Group Name</label><input class="form-control" id="g_name" placeholder="e.g. Debate Team — Senior Cohort"></div>
+        <div class="mb-2"><label class="form-label">Focus Area <small class="text-muted">(optional)</small></label><input class="form-control" id="g_focus" placeholder="e.g. Public Speaking"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="g_description" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitGroup()">Create Group</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("training-groups");
+const user = getUser();
+if (["admin", "moderator", "mentor"].includes(user.role)) {
+  document.getElementById("new-group-btn").style.display = "inline-block";
+}
+
+async function loadGroups() {
+  const groups = await api("/training-groups");
+  const grid = document.getElementById("groups-grid");
+  if (!groups.length) {
+    grid.innerHTML = `<p class="text-muted">${["admin","moderator"].includes(user.role) ? "No training groups yet — create one to get started." : "You haven't been added to a training group yet."}</p>`;
+    return;
+  }
+  grid.innerHTML = groups.map(g => `
+    <div class="col-md-4">
+      <div class="card card-rc h-100 p-3">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="mb-0">${escapeHtml(g.name)}</h5>
+          ${g.is_trainer ? `<span class="category-pill" style="width:fit-content;">Trainer</span>` : ""}
+        </div>
+        ${g.focus_area ? `<div class="text-muted small mb-2">${escapeHtml(g.focus_area)}</div>` : ""}
+        <p class="small">${escapeHtml(g.description || "")}</p>
+        <div class="d-flex justify-content-between align-items-center mt-auto">
+          <span class="category-pill">${g.member_count} member${g.member_count === 1 ? "" : "s"} &middot; ${g.session_count} session${g.session_count === 1 ? "" : "s"}</span>
+          <a href="training-group.html?id=${g.id}" class="btn btn-sm btn-outline-secondary">Open</a>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function submitGroup() {
+  const payload = {
+    name: document.getElementById("g_name").value,
+    focus_area: document.getElementById("g_focus").value || null,
+    description: document.getElementById("g_description").value || null,
+  };
+  if (!payload.name.trim()) {
+    showAlert("group-alert", "Give the training group a name.");
+    return;
+  }
+  try {
+    const created = await api("/training-groups", { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("groupModal")).hide();
+    window.location.href = `training-group.html?id=${created.id}`;
+  } catch (err) {
+    showAlert("group-alert", err.message);
+  }
+}
+
+loadGroups();
+</script>
+</body>
+</html>

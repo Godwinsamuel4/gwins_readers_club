@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mentors — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 class="mb-1">🧑‍🏫 Reading Mentors</h3>
+  <p class="text-muted small">Connect with mentors for book recommendations, guidance, and support.</p>
+
+  <div id="become-mentor-box" style="display:none;" class="card card-rc p-3 mb-4">
+    <h6>Your Mentor Profile</h6>
+    <div id="mentor-profile-alert"></div>
+    <div class="mb-2"><label class="form-label">Specialties (comma-separated)</label><input class="form-control" id="m_specialties" placeholder="e.g. Career guidance, African Literature"></div>
+    <div class="mb-2"><label class="form-label">Bio</label><textarea class="form-control" id="m_bio" rows="2"></textarea></div>
+    <button class="btn btn-rc" style="width:fit-content;" onclick="saveMentorProfile()">Save & Accept Mentees</button>
+  </div>
+
+  <div class="row g-4 mb-4" id="mentors-grid">Loading...</div>
+
+  <div class="card card-rc p-3">
+    <h6>My Mentorship Requests</h6>
+    <div id="requests-list">Loading...</div>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("mentors");
+const user = getUser();
+if (user.role === "mentor" || user.role === "admin") {
+  document.getElementById("become-mentor-box").style.display = "block";
+}
+
+async function loadMentors() {
+  const mentors = await api("/mentors");
+  const grid = document.getElementById("mentors-grid");
+  if (!mentors.length) { grid.innerHTML = `<p class="text-muted">No mentors accepting mentees right now.</p>`; return; }
+  grid.innerHTML = mentors.map(m => `
+    <div class="col-md-4">
+      <div class="card card-rc h-100 p-3">
+        <h5>${escapeHtml(m.mentor_name)}</h5>
+        <div class="text-muted small mb-2">${escapeHtml(m.specialties || "General reading guidance")}</div>
+        ${m.rating_count > 0 ? `<div class="small mb-1">${"★".repeat(Math.round(m.average_rating))}${"☆".repeat(5 - Math.round(m.average_rating))} ${m.average_rating} (${m.rating_count} reviews)</div>` : `<div class="small text-muted mb-1">No ratings yet</div>`}
+        <p class="small">${escapeHtml(m.bio || "")}</p>
+        <button class="btn btn-sm btn-rc-gold mt-auto" style="width:fit-content;" onclick="requestMentor(${m.user_id})">Request Mentorship</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function requestMentor(mentorId) {
+  try {
+    await api(`/mentors/${mentorId}/request`, { method: "POST" });
+    alert("Mentorship request sent!");
+    loadRequests();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function saveMentorProfile() {
+  const payload = {
+    specialties: document.getElementById("m_specialties").value,
+    bio: document.getElementById("m_bio").value,
+  };
+  try {
+    await api("/mentors/become-a-mentor", { method: "POST", body: JSON.stringify(payload) });
+    showAlert("mentor-profile-alert", "Profile saved — you're now visible to mentees.", "success");
+    loadMentors();
+  } catch (err) {
+    showAlert("mentor-profile-alert", err.message);
+  }
+}
+
+async function loadRequests() {
+  const reqs = await api("/mentors/requests/mine");
+  const el = document.getElementById("requests-list");
+  if (!reqs.length) { el.innerHTML = `<p class="text-muted small mb-0">No mentorship requests yet.</p>`; return; }
+  el.innerHTML = reqs.map(r => {
+    const isMentor = r.mentor_id === user.id;
+    const otherParty = isMentor ? r.mentee_name : r.mentor_name;
+    return `
+      <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+        <div>
+          <strong class="small">${escapeHtml(otherParty)}</strong>
+          <span class="text-muted small ms-2">${isMentor ? "wants to be mentored by you" : "your mentor"}</span>
+        </div>
+        <div>
+          <span class="badge bg-${r.status === "accepted" ? "success" : r.status === "declined" ? "secondary" : r.status === "ended" ? "dark" : "warning text-dark"}">${r.status}</span>
+          ${isMentor && r.status === "pending" ? `
+            <button class="btn btn-sm btn-outline-success ms-1" onclick="respond(${r.id}, 'accepted')">Accept</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="respond(${r.id}, 'declined')">Decline</button>` : ""}
+          ${r.status === "accepted" ? `<button class="btn btn-sm btn-outline-secondary ms-1" onclick="respond(${r.id}, 'ended')">End Mentorship</button>` : ""}
+          ${!isMentor && r.status === "ended" ? `<button class="btn btn-sm btn-outline-warning ms-1" onclick="rateMentor(${r.id})">Rate Mentor</button>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function respond(requestId, status) {
+  await api(`/mentors/requests/${requestId}?status=${status}`, { method: "PUT" });
+  loadRequests();
+}
+
+async function rateMentor(requestId) {
+  const rating = prompt("Rate your mentor 1-5:");
+  if (!rating || isNaN(rating) || rating < 1 || rating > 5) { if (rating !== null) alert("Enter a number 1-5"); return; }
+  const review_text = prompt("Add a short review (optional):") || null;
+  try {
+    await api(`/mentors/requests/${requestId}/rate`, {
+      method: "POST", body: JSON.stringify({ rating: parseInt(rating), review_text }),
+    });
+    alert("Thanks for rating your mentor!");
+    loadRequests();
+    loadMentors();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+loadMentors();
+loadRequests();
+</script>
+</body>
+</html>

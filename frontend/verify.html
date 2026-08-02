@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Verify a Certificate — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<nav class="navbar navbar-rc">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="img/logo.png" alt="Gwin's Readers Club" class="navbar-logo-img">Gwin's Readers Club</a>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 560px; margin-top: 60px; margin-bottom: 60px;">
+  <div class="card card-rc p-4">
+    <h4 class="mb-1 text-center">Certificate Verification</h4>
+    <p class="text-muted small text-center mb-4">Confirm that a Gwin's Readers Club certificate is genuine and current.</p>
+
+    <form id="verify-form" class="mb-4">
+      <div class="input-group">
+        <input type="text" class="form-control" id="code-input" placeholder="Enter verification code (e.g. 4F82A1C9E0)" style="text-transform:uppercase;">
+        <button class="btn btn-rc" type="submit">Verify</button>
+      </div>
+    </form>
+
+    <div id="result"></div>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+function renderResult(data) {
+  const box = document.getElementById("result");
+  if (data.valid) {
+    box.innerHTML = `
+      <div class="text-center p-4" style="border:2px solid var(--rc-green); border-radius:10px; background:rgba(63,120,86,0.06);">
+        <div style="font-size:2rem;">&#10003;</div>
+        <h5 style="color: var(--rc-green);" class="mt-2">Genuine Certificate</h5>
+        <p class="mb-1"><strong>${escapeHtml(data.recipient_name || "")}</strong></p>
+        <p class="mb-1">${escapeHtml(data.title || "")}</p>
+        <p class="text-muted small mb-0">Issued ${data.issued_at ? new Date(data.issued_at).toLocaleDateString(undefined, {year:'numeric', month:'long', day:'numeric'}) : ""}</p>
+      </div>`;
+  } else {
+    box.innerHTML = `
+      <div class="text-center p-4" style="border:2px solid var(--rc-clay); border-radius:10px; background:rgba(156,59,46,0.06);">
+        <div style="font-size:2rem;">&#10007;</div>
+        <h5 style="color: var(--rc-clay);" class="mt-2">${data.revoked ? "Certificate Revoked" : "Not Found"}</h5>
+        <p class="mb-0 small text-muted">${escapeHtml(data.message || "This code doesn't match a certificate on record.")}</p>
+      </div>`;
+  }
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.innerText = s;
+  return d.innerHTML;
+}
+
+async function runVerify(code) {
+  const box = document.getElementById("result");
+  box.innerHTML = `<p class="text-center text-muted">Checking…</p>`;
+  try {
+    const data = await api(`/certificates/verify/${encodeURIComponent(code)}`);
+    renderResult(data);
+  } catch (err) {
+    box.innerHTML = `<p class="text-center text-danger small">Something went wrong verifying this code. Please try again.</p>`;
+  }
+}
+
+document.getElementById("verify-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = document.getElementById("code-input").value.trim().toUpperCase();
+  if (!code) return;
+  runVerify(code);
+});
+
+const preset = new URLSearchParams(window.location.search).get("code");
+if (preset) {
+  document.getElementById("code-input").value = preset.toUpperCase();
+  runVerify(preset.toUpperCase());
+}
+</script>
+</body>
+</html>

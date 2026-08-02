@@ -1,0 +1,22 @@
+# Secrets / local env config
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local SQLite fallback DB (dev only — Postgres is the real datastore now)
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+backend/*.db.bak-*
+
+# Locally generated / scratch files (certificates are regenerated on demand)
+backend/generated_certificates/
+
+# OS/editor cruft
+.DS_Store
+*.swp

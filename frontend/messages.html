@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Messages — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+<style>
+  #thread-window { height: 45vh; overflow-y: auto; background: #fff; border-radius: 10px; padding: 14px; }
+  .msg-bubble { max-width: 75%; padding: 8px 12px; border-radius: 12px; margin-bottom: 8px; }
+  .msg-mine { background: var(--rc-purple); color: #fff; margin-left: auto; }
+  .msg-theirs { background: var(--rc-cream); }
+</style>
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <h3 class="mb-3">✉️ Messages</h3>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div class="card card-rc p-3">
+        <h6>Conversations</h6>
+        <div id="conversations-list">Loading...</div>
+        <hr>
+        <label class="form-label small">Start a new conversation</label>
+        <select class="form-select form-select-sm" id="new-conv-select"></select>
+        <button class="btn btn-sm btn-rc mt-2" onclick="startConversation()">Message</button>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card card-rc p-3">
+        <h6 id="thread-header">Select a conversation</h6>
+        <div id="thread-window"><p class="text-muted small">No conversation selected.</p></div>
+        <form id="send-form" class="d-flex gap-2 mt-3" style="display:none;">
+          <input type="text" class="form-control" id="msg-input" placeholder="Type a message...">
+          <button type="submit" class="btn btn-rc">Send</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("");
+const user = getUser();
+let activeUserId = null;
+
+let lastConvos = [];
+
+async function loadConversations() {
+  const convos = await api("/messages/conversations");
+  lastConvos = convos;
+  const el = document.getElementById("conversations-list");
+  if (!convos.length) { el.innerHTML = `<p class="text-muted small mb-0">No conversations yet.</p>`; return; }
+  el.innerHTML = convos.map(c => `
+    <button class="btn btn-sm w-100 text-start mb-1 conv-btn ${c.unread_count > 0 ? "btn-outline-primary" : "btn-outline-secondary"}" data-user-id="${c.other_user_id}">
+      ${escapeHtml(c.other_user_name)} ${c.unread_count > 0 ? `<span class="badge bg-danger">${c.unread_count}</span>` : ""}
+      <div class="small text-truncate text-muted">${escapeHtml(c.last_message)}</div>
+    </button>
+  `).join("");
+  el.querySelectorAll(".conv-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = parseInt(btn.dataset.userId);
+      const convo = lastConvos.find(c => c.other_user_id === id);
+      openThread(id, convo ? convo.other_user_name : "");
+    });
+  });
+}
+
+async function loadPeopleOptions() {
+  const users = await api("/messages/contacts").catch(() => []);
+  const sel = document.getElementById("new-conv-select");
+  sel.innerHTML = users.map(u => `<option value="${u.id}">${escapeHtml(u.full_name)} (${escapeHtml(u.role)})</option>`).join("")
+    || `<option value="">No contacts yet — join a club or connect with a mentor</option>`;
+}
+
+function startConversation() {
+  const id = document.getElementById("new-conv-select").value;
+  if (!id) return;
+  const name = document.getElementById("new-conv-select").selectedOptions[0].text;
+  openThread(parseInt(id), name);
+}
+
+async function openThread(otherUserId, otherUserName) {
+  activeUserId = otherUserId;
+  document.getElementById("thread-header").textContent = otherUserName;
+  document.getElementById("send-form").style.display = "flex";
+  const messages = await api(`/messages/with/${otherUserId}`);
+  const win = document.getElementById("thread-window");
+  if (!messages.length) {
+    win.innerHTML = `<p class="text-muted small">No messages yet — say hello!</p>`;
+  } else {
+    win.innerHTML = messages.map(m => `
+      <div class="msg-bubble ${m.sender_id === user.id ? "msg-mine" : "msg-theirs"} position-relative">
+        ${escapeHtml(m.content)}
+        <div class="small d-flex justify-content-between align-items-center" style="opacity:0.7;">
+          <span>${new Date(m.created_at + (m.created_at.endsWith("Z")?"":"Z")).toLocaleTimeString()}</span>
+          <span>
+            <button class="btn btn-sm btn-link p-0 ms-2" style="font-size:0.7rem; color:inherit; opacity:0.8;" onclick="reportMessage(${m.id})" title="Report this message">🚩</button>
+            <button class="btn btn-sm btn-link p-0 ms-2" style="font-size:0.7rem; color:inherit; opacity:0.8;" onclick="deleteMessage(${m.id})" title="Delete for me">✕</button>
+          </span>
+        </div>
+      </div>
+    `).join("");
+  }
+  win.scrollTop = win.scrollHeight;
+  loadConversations();
+}
+
+document.getElementById("send-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("msg-input");
+  const content = input.value.trim();
+  if (!content || !activeUserId) return;
+  input.value = "";
+  try {
+    await api("/messages", { method: "POST", body: JSON.stringify({ recipient_id: activeUserId, content }) });
+    const name = document.getElementById("thread-header").textContent;
+    openThread(activeUserId, name);
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+async function reportMessage(messageId) {
+  const reason = prompt("Why are you reporting this message? (e.g. inappropriate, harassment, asking to move off-platform)");
+  if (!reason || !reason.trim()) return;
+  try {
+    await api("/reports", { method: "POST", body: JSON.stringify({ content_type: "message", content_id: messageId, reason: reason.trim() }) });
+    alert("Thanks — this message has been reported to our moderators.");
+  } catch (e) {
+    alert("Couldn't submit the report. Please try again.");
+  }
+}
+
+async function deleteMessage(messageId) {
+  if (!confirm("Delete this message? It will only be removed from your view.")) return;
+  await api(`/messages/${messageId}`, { method: "DELETE" });
+  const name = document.getElementById("thread-header").textContent;
+  openThread(activeUserId, name);
+}
+
+loadConversations();
+loadPeopleOptions();
+</script>
+</body>
+</html>

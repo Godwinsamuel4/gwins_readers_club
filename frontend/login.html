@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Log In — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<nav class="navbar navbar-rc">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="img/logo.png" alt="Gwin's Readers Club" class="navbar-logo-img">Gwin's Readers Club</a>
+  </div>
+</nav>
+
+<div class="container" style="max-width: 420px; margin-top: 60px;">
+  <div class="card card-rc p-4">
+    <h4 class="mb-3 text-center">Welcome Back</h4>
+    <div id="alert-box"></div>
+    <form id="login-form">
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" class="form-control" id="email" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-control" id="password" required>
+      </div>
+      <button type="submit" class="btn btn-rc w-100">Log In</button>
+    </form>
+    <p class="text-center mt-3 mb-0 small">New here? <a href="register.html">Create an account</a></p>
+    <p class="text-center mt-1 mb-0 small"><a href="forgot-password.html">Forgot your password?</a></p>
+    <div id="reactivate-box" class="d-none text-center mt-2">
+      <button class="btn btn-sm btn-outline-secondary" onclick="reactivateAccount()">Reactivate my account</button>
+    </div>
+    <hr>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+if (new URLSearchParams(window.location.search).get("idle") === "1") {
+  showAlert("alert-box", "You were signed out after 20 minutes of inactivity, to keep your account safe on shared devices. Log back in to continue.", "info");
+}
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    const data = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    setSession(data.access_token, data.user);
+    window.location.href = "dashboard.html";
+  } catch (err) {
+    showAlert("alert-box", err.message);
+    document.getElementById("reactivate-box").classList.toggle("d-none", !err.message.toLowerCase().includes("deactivat"));
+  }
+});
+
+async function reactivateAccount() {
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  try {
+    const data = await api("/auth/reactivate", {
+      method: "POST", body: JSON.stringify({ email, password }),
+    });
+    setSession(data.access_token, data.user);
+    window.location.href = "dashboard.html";
+  } catch (err) {
+    showAlert("alert-box", err.message);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Profile — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4" style="max-width: 640px;">
+  <h3 class="mb-4">Profile & Settings</h3>
+
+  <div class="card card-rc p-4 mb-3">
+    <h6>Profile Picture</h6>
+    <div id="avatar-alert"></div>
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <img id="avatar-preview" src="" alt="Your profile picture" style="width:84px; height:84px; border-radius:50%; object-fit:cover; border:2px solid var(--rc-gold); background:var(--rc-cream); display:none;">
+      <div id="avatar-initials-fallback" class="d-flex align-items-center justify-content-center" style="width:84px; height:84px; border-radius:50%; background:var(--rc-purple); color:#fff; font-weight:700; font-size:1.4rem;"></div>
+    </div>
+
+    <div id="staff-avatar-upload" class="d-none">
+      <p class="text-muted small">As staff, you can upload a real profile photo. Members choose an illustrated avatar instead, so no child is prompted to upload a photo of themselves.</p>
+      <input type="file" class="form-control mb-2" id="avatar-file-input" accept="image/png,image/jpeg,image/webp">
+      <button class="btn btn-outline-secondary btn-sm" onclick="uploadAvatar()">Upload Photo</button>
+    </div>
+
+    <div id="member-avatar-picker" class="d-none">
+      <p class="text-muted small">Pick an avatar to represent you on the platform.</p>
+      <div class="row g-2" id="avatar-preset-grid"></div>
+    </div>
+  </div>
+
+  <div class="card card-rc p-4 mb-3">
+    <div id="profile-alert"></div>
+    <div class="mb-2"><label class="form-label">Full Name</label><input class="form-control" id="full_name"></div>
+    <div class="mb-2"><label class="form-label">Email</label><input class="form-control" id="email" disabled></div>
+    <div class="row">
+      <div class="col-md-6 mb-2"><label class="form-label">Phone</label><input class="form-control" id="phone_number"></div>
+      <div class="col-md-6 mb-2"><label class="form-label">School</label><input class="form-control" id="school"></div>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-2"><label class="form-label">State</label><input class="form-control" id="state"></div>
+      <div class="col-md-6 mb-2"><label class="form-label">Department</label><input class="form-control" id="department"></div>
+    </div>
+    <div class="mb-2"><label class="form-label">Reading Interests</label><input class="form-control" id="reading_interests"></div>
+    <div class="mb-2"><label class="form-label">Biography</label><textarea class="form-control" id="biography" rows="2"></textarea></div>
+    <span class="badge bg-secondary badge-role" id="role-badge" style="width:fit-content;"></span>
+    <button class="btn btn-rc mt-3" onclick="saveProfile()">Save Changes</button>
+  </div>
+
+  <div class="card card-rc p-4 mb-3">
+    <h6>Change Password</h6>
+    <div id="password-alert"></div>
+    <div class="mb-2"><label class="form-label">Current Password</label><input type="password" class="form-control" id="current_password"></div>
+    <div class="mb-2"><label class="form-label">New Password</label><input type="password" class="form-control" id="new_password"></div>
+    <button class="btn btn-outline-secondary" onclick="changePassword()">Update Password</button>
+  </div>
+
+  <div class="card card-rc p-4 border-danger">
+    <h6 class="text-danger">Danger Zone</h6>
+    <p class="text-muted small">Deactivating hides your account and signs you out. You can reactivate any time by logging in again with the same email and password.</p>
+    <div id="deactivate-alert"></div>
+    <button class="btn btn-outline-danger" style="width:fit-content;" onclick="deactivateAccount()">Deactivate My Account</button>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("");
+
+const STAFF_ROLES = ["admin", "moderator", "mentor"];
+const PRESET_AVATARS = [
+  "avatar_male_1", "avatar_male_2", "avatar_male_3", "avatar_male_4",
+  "avatar_female_1", "avatar_female_2", "avatar_female_3", "avatar_female_4",
+];
+
+function renderAvatarPreview(me) {
+  const img = document.getElementById("avatar-preview");
+  const fallback = document.getElementById("avatar-initials-fallback");
+  const pic = me.profile_picture;
+  if (pic && pic.startsWith("upload:")) {
+    img.src = `/api/auth/avatar/${me.id}?t=${Date.now()}`;
+    img.style.display = "block";
+    fallback.style.display = "none";
+  } else if (pic) {
+    img.src = `img/avatars/${pic}.svg`;
+    img.style.display = "block";
+    fallback.style.display = "none";
+  } else {
+    img.style.display = "none";
+    fallback.style.display = "flex";
+    fallback.textContent = initials(me.full_name || "?");
+  }
+}
+
+function renderAvatarControls(me) {
+  if (STAFF_ROLES.includes(me.role)) {
+    document.getElementById("staff-avatar-upload").classList.remove("d-none");
+  } else {
+    document.getElementById("member-avatar-picker").classList.remove("d-none");
+    const grid = document.getElementById("avatar-preset-grid");
+    grid.innerHTML = PRESET_AVATARS.map(key => `
+      <div class="col-3 col-md-3 text-center">
+        <img src="img/avatars/${key}.svg" alt="${key}" class="avatar-choice ${me.profile_picture === key ? 'avatar-choice-selected' : ''}"
+             style="width:100%; max-width:64px; border-radius:50%; cursor:pointer; border:3px solid ${me.profile_picture === key ? 'var(--rc-gold)' : 'transparent'};"
+             onclick="choosePresetAvatar('${key}')">
+      </div>
+    `).join("");
+  }
+}
+
+async function choosePresetAvatar(key) {
+  try {
+    const updated = await api("/auth/me/avatar-preset", { method: "PUT", body: JSON.stringify({ preset: key }) });
+    const user = getUser();
+    user.profile_picture = updated.profile_picture;
+    safeStorageSet("rc_user", JSON.stringify(user));
+    renderAvatarPreview(updated);
+    renderAvatarControls(updated);
+    showAlert("avatar-alert", "Avatar updated!", "success");
+  } catch (err) {
+    showAlert("avatar-alert", err.message);
+  }
+}
+
+async function uploadAvatar() {
+  const input = document.getElementById("avatar-file-input");
+  if (!input.files.length) {
+    showAlert("avatar-alert", "Choose a photo first.");
+    return;
+  }
+  const formData = new FormData();
+  formData.append("file", input.files[0]);
+  try {
+    const updated = await apiUpload("/auth/me/avatar", formData);
+    const user = getUser();
+    user.profile_picture = updated.profile_picture;
+    safeStorageSet("rc_user", JSON.stringify(user));
+    renderAvatarPreview(updated);
+    showAlert("avatar-alert", "Profile photo updated!", "success");
+  } catch (err) {
+    showAlert("avatar-alert", err.message);
+  }
+}
+
+async function loadProfile() {
+  const me = await api("/auth/me");
+  document.getElementById("full_name").value = me.full_name || "";
+  document.getElementById("email").value = me.email || "";
+  document.getElementById("phone_number").value = me.phone_number || "";
+  document.getElementById("school").value = me.school || "";
+  document.getElementById("state").value = me.state || "";
+  document.getElementById("department").value = me.department || "";
+  document.getElementById("reading_interests").value = me.reading_interests || "";
+  document.getElementById("biography").value = me.biography || "";
+  document.getElementById("role-badge").textContent = me.role;
+  renderAvatarPreview(me);
+  renderAvatarControls(me);
+}
+
+async function saveProfile() {
+  const payload = {
+    full_name: document.getElementById("full_name").value,
+    phone_number: document.getElementById("phone_number").value,
+    school: document.getElementById("school").value,
+    state: document.getElementById("state").value,
+    department: document.getElementById("department").value,
+    reading_interests: document.getElementById("reading_interests").value,
+    biography: document.getElementById("biography").value,
+  };
+  try {
+    const updated = await api("/auth/me", { method: "PUT", body: JSON.stringify(payload) });
+    const user = getUser();
+    user.full_name = updated.full_name;
+    safeStorageSet("rc_user", JSON.stringify(user));
+    showAlert("profile-alert", "Profile updated successfully.", "success");
+  } catch (err) {
+    showAlert("profile-alert", err.message);
+  }
+}
+
+async function changePassword() {
+  const current_password = document.getElementById("current_password").value;
+  const new_password = document.getElementById("new_password").value;
+  try {
+    await api("/auth/change-password", {
+      method: "POST", body: JSON.stringify({ current_password, new_password }),
+    });
+    showAlert("password-alert", "Password updated.", "success");
+    document.getElementById("current_password").value = "";
+    document.getElementById("new_password").value = "";
+  } catch (err) {
+    showAlert("password-alert", err.message);
+  }
+}
+
+async function deactivateAccount() {
+  if (!confirm("Deactivate your account? You'll be signed out immediately, but can log back in any time to reactivate.")) return;
+  const password = prompt("Confirm your password to deactivate:");
+  if (!password) return;
+  try {
+    await api("/auth/deactivate", { method: "POST", body: JSON.stringify({ password }) });
+    alert("Your account has been deactivated. Log in again any time to reactivate it.");
+    clearSession();
+    window.location.href = "login.html";
+  } catch (err) {
+    showAlert("deactivate-alert", err.message);
+  }
+}
+
+loadProfile();
+</script>
+</body>
+</html>

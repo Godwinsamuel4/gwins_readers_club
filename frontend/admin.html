@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Dashboard — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+<style>
+  .admin-tabs { flex-wrap: wrap; }
+  .thumb-60 { width:44px; height:60px; object-fit:cover; border-radius:4px; background:#eee; }
+  .mini-table td, .mini-table th { vertical-align: middle; }
+  .sub-nav .btn { margin-right:.25rem; margin-bottom:.5rem; }
+</style>
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container-fluid py-4" style="max-width:1300px;">
+  <h3 class="mb-4">🛠️ Admin Dashboard</h3>
+
+  <div class="row g-3 mb-4" id="stats-row">Loading...</div>
+
+  <ul class="nav nav-pills admin-tabs mb-3" id="admin-tab-nav">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-users">Members</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-books">Books</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-categories">Categories</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-botm">Book of the Month</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-challenges">Challenges</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-clubs">Clubs & Events</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mentors">Mentors</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-live">Live Sessions</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-resources">Resources</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-opportunities">Opportunities</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-reviews">Reviews</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-discussions">Discussions</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-certificates">Certificates</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-broadcast">Broadcast</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-reports">Reports</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-donations">Donations</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-import">Bulk Import</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-audit">Audit Log</button></li>
+  </ul>
+
+  <div class="tab-content">
+
+    <!-- ============ MEMBERS ============ -->
+    <div class="tab-pane fade show active" id="tab-users">
+      <div class="row g-2 mb-3">
+        <div class="col-md-4"><input class="form-control" id="user-search" placeholder="Search by name or email..."></div>
+        <div class="col-md-3">
+          <select class="form-select" id="role-filter">
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="moderator">Moderator</option>
+            <option value="mentor">Mentor</option>
+            <option value="member">Member</option>
+          </select>
+        </div>
+        <div class="col-md-2"><button class="btn btn-rc w-100" onclick="loadUsers()">Filter</button></div>
+        <div class="col-md-2"><button class="btn btn-outline-secondary w-100" onclick="exportUsersCsv()">⬇ Export CSV</button></div>
+      </div>
+      <div class="table-responsive">
+        <table class="table bg-white mini-table">
+          <thead><tr><th>Name</th><th>Email</th><th>School</th><th>Role</th><th>Joined</th><th></th></tr></thead>
+          <tbody id="users-table">Loading...</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ BOOKS ============ -->
+    <div class="tab-pane fade" id="tab-books">
+      <div class="card card-rc p-3 mb-3">
+        <h6 id="book-form-title">Add a Book</h6>
+        <div id="book-form-alert"></div>
+        <form id="book-form" onsubmit="event.preventDefault(); saveBook();">
+          <div class="row g-2">
+            <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="bk_title" required></div>
+            <div class="col-md-6"><label class="form-label">Author</label><input class="form-control" id="bk_author" required></div>
+            <div class="col-md-4"><label class="form-label">Category</label><select class="form-select" id="bk_category" required></select></div>
+            <div class="col-md-4"><label class="form-label">Publisher</label><input class="form-control" id="bk_publisher"></div>
+            <div class="col-md-4"><label class="form-label">Language</label><input class="form-control" id="bk_language" value="English"></div>
+            <div class="col-md-4"><label class="form-label">Pages</label><input type="number" min="0" class="form-control" id="bk_pages" value="0"></div>
+            <div class="col-md-4"><label class="form-label">Reading Time (min)</label><input type="number" min="0" class="form-control" id="bk_reading_time" value="0"></div>
+            <div class="col-md-4"><label class="form-label">Publication Year</label><input type="number" class="form-control" id="bk_year"></div>
+            <div class="col-12"><label class="form-label">Description</label><textarea class="form-control" id="bk_description" rows="2"></textarea></div>
+            <div class="col-md-6">
+              <label class="form-label">Book File <small class="text-muted">(.txt, .pdf, .docx, .epub — text auto-extracted for the online reader)</small></label>
+              <input type="file" class="form-control" id="bk_file" accept=".txt,.pdf,.docx,.epub">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Cover Image <small class="text-muted">(jpg/png/webp, optional)</small></label>
+              <input type="file" class="form-control" id="bk_cover" accept="image/*">
+            </div>
+            <div class="col-md-4"><label class="form-label">Cover Color</label><input type="color" class="form-control form-control-color" id="bk_cover_color" value="#35538F"></div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="bk_featured">
+                <label class="form-check-label" for="bk_featured">Featured</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Content <small class="text-muted">(auto-filled from an uploaded file — you can also paste/edit plain text directly)</small></label>
+              <textarea class="form-control" id="bk_content" rows="4"></textarea>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-rc" type="submit" id="book-submit-btn">Add Book</button>
+            <button class="btn btn-outline-secondary d-none" type="button" id="book-cancel-btn" onclick="cancelBookEdit()">Cancel Edit</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card card-rc p-3">
+        <div class="row g-2 mb-2">
+          <div class="col-md-3"><input class="form-control" id="book-search" placeholder="Search title/author..." onkeydown="if(event.key==='Enter') loadBooks();"></div>
+          <div class="col-md-2">
+            <select class="form-select" id="book-category-filter" onchange="loadBooks()"><option value="">All Categories</option></select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" id="book-status-filter" onchange="loadBooks()">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending review</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div class="col-md-2"><button class="btn btn-rc w-100" onclick="loadBooks()">Search</button></div>
+          <div class="col-md-3"><button class="btn btn-outline-danger w-100" onclick="bulkDeleteBooks()">Delete Selected</button></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th></th><th>Cover</th><th>Title</th><th>Author</th><th>Category</th><th>File</th><th>Status</th><th>Featured</th><th></th></tr></thead>
+            <tbody id="books-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CATEGORIES ============ -->
+    <div class="tab-pane fade" id="tab-categories">
+      <div class="card card-rc p-3 mb-3" style="max-width:500px;">
+        <h6>Add a Category</h6>
+        <div id="category-alert"></div>
+        <div class="input-group">
+          <input class="form-control" id="new-category-name" placeholder="e.g. Poetry">
+          <button class="btn btn-rc" onclick="createCategory()">Add</button>
+        </div>
+      </div>
+      <div class="card card-rc p-3" style="max-width:500px;">
+        <h6>Existing Categories</h6>
+        <div id="categories-list">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ============ BOOK OF THE MONTH ============ -->
+    <div class="tab-pane fade" id="tab-botm">
+      <div class="card card-rc p-3" style="max-width:600px;">
+        <h6>Set Book of the Month</h6>
+        <div id="botm-alert"></div>
+        <div class="mb-2">
+          <label class="form-label">Book</label>
+          <select class="form-select" id="botm_book_id"></select>
+        </div>
+        <div class="row">
+          <div class="col-6 mb-2"><label class="form-label">Month</label><input type="number" min="1" max="12" class="form-control" id="botm_month"></div>
+          <div class="col-6 mb-2"><label class="form-label">Year</label><input type="number" class="form-control" id="botm_year"></div>
+        </div>
+        <div class="mb-2"><label class="form-label">Reading Guide</label><textarea class="form-control" id="botm_guide" rows="2"></textarea></div>
+        <div class="mb-2"><label class="form-label">Discussion Questions (one per line)</label><textarea class="form-control" id="botm_questions" rows="3"></textarea></div>
+        <button class="btn btn-rc" id="botm-submit-btn" onclick="setBotm()">Publish</button>
+        <button class="btn btn-outline-secondary d-none" id="botm-cancel-edit-btn" onclick="cancelBotmEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3 mt-3" style="max-width:600px;">
+        <h6>Past Book of the Month Entries</h6>
+        <div id="botm-history">Loading...</div>
+      </div>
+    </div>
+
+    <!-- ============ CHALLENGES ============ -->
+    <div class="tab-pane fade" id="tab-challenges">
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="challenge-form-title">Create a Reading Challenge</h6>
+        <div id="challenge-alert"></div>
+        <div class="mb-2"><label class="form-label">Name</label><input class="form-control" id="ch_name"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="ch_description" rows="2"></textarea></div>
+        <div class="row">
+          <div class="col-6 mb-2"><label class="form-label">Start Date</label><input type="date" class="form-control" id="ch_start"></div>
+          <div class="col-6 mb-2"><label class="form-label">End Date</label><input type="date" class="form-control" id="ch_end"></div>
+        </div>
+        <div class="mb-2"><label class="form-label">Target Books</label><input type="number" min="1" value="1" class="form-control" id="ch_target"></div>
+        <button class="btn btn-rc" id="challenge-submit-btn" onclick="saveChallenge()">Create Challenge</button>
+        <button class="btn btn-outline-secondary d-none" id="challenge-cancel-btn" onclick="cancelChallengeEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>Existing Challenges</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Name</th><th>Window</th><th>Target</th><th>Participants</th><th></th></tr></thead>
+            <tbody id="challenges-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CLUBS & EVENTS ============ -->
+    <div class="tab-pane fade" id="tab-clubs">
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="club-form-title">Create a Reading Club</h6>
+        <div id="club-alert"></div>
+        <div class="mb-2"><label class="form-label">Name</label><input class="form-control" id="club_name"></div>
+        <div class="mb-2"><label class="form-label">School / Organization</label><input class="form-control" id="club_school"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="club_description" rows="2"></textarea></div>
+        <button class="btn btn-rc" id="club-submit-btn" onclick="saveClub()">Create Club</button>
+        <button class="btn btn-outline-secondary d-none" id="club-cancel-btn" onclick="cancelClubEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>Existing Clubs</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Name</th><th>School/Org</th><th>Members</th><th></th></tr></thead>
+            <tbody id="clubs-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card card-rc p-3 mt-3" style="max-width:600px;">
+        <h6>Add Event to a Club</h6>
+        <div id="event-alert"></div>
+        <div class="mb-2"><label class="form-label">Club</label><select class="form-select" id="event_club_id"></select></div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="event_title"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="event_description" rows="2"></textarea></div>
+        <div class="mb-2"><label class="form-label">Date & Time</label><input type="datetime-local" class="form-control" id="event_date"></div>
+        <button class="btn btn-rc" onclick="createEvent()">Add Event</button>
+      </div>
+    </div>
+
+    <!-- ============ MENTORS ============ -->
+    <div class="tab-pane fade" id="tab-mentors">
+      <p class="text-muted small">To make someone a mentor, set their role to "mentor" in the Members tab first. Once they're a mentor, you can create or edit their public listing directly here — no need to wait for them to self-apply.</p>
+
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="mentor-form-title">Create / Edit Mentor Profile</h6>
+        <div id="mentor-form-alert"></div>
+        <div class="mb-2"><label class="form-label">Mentor's User ID <small class="text-muted">(find it next to their name in the Members tab)</small></label><input type="number" class="form-control" id="mp_user_id"></div>
+        <div class="mb-2"><label class="form-label">Specialties <small class="text-muted">(comma-separated)</small></label><input class="form-control" id="mp_specialties" placeholder="e.g. Fiction, Career Coaching, Study Skills"></div>
+        <div class="mb-2"><label class="form-label">Bio</label><textarea class="form-control" id="mp_bio" rows="2"></textarea></div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="mp_accepting" checked>
+          <label class="form-check-label" for="mp_accepting">Accepting mentees</label>
+        </div>
+        <button class="btn btn-rc" style="width:fit-content;" onclick="saveMentorProfile()">Save Profile</button>
+      </div>
+
+      <div class="card card-rc p-3 mb-3">
+        <h6>Mentor Listings</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Mentor</th><th>Specialties</th><th>Bio</th><th>Accepting Mentees</th><th>Rating</th><th></th></tr></thead>
+            <tbody id="mentors-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card card-rc p-3">
+        <h6>Mentorship Pairings</h6>
+        <p class="text-muted small mb-2">Every mentor/mentee request across the whole club — useful for spotting mentors who never respond, or stepping into a pairing that's gone quiet.</p>
+        <div class="sub-nav mb-2">
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadMentorshipPairings('pending')">Pending</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadMentorshipPairings('accepted')">Accepted</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadMentorshipPairings('ended')">Ended</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadMentorshipPairings('')">All</button>
+        </div>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Mentor</th><th>Mentee</th><th>Status</th><th>Requested</th><th></th></tr></thead>
+            <tbody id="mentorship-pairings-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LIVE SESSIONS ============ -->
+    <div class="tab-pane fade" id="tab-live">
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="live-form-title">Schedule a Live Session</h6>
+        <div id="live-alert"></div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="live_title"></div>
+        <div class="mb-2"><label class="form-label">Type</label>
+          <select class="form-select" id="live_type">
+            <option value="live_chat">Live Chat</option>
+            <option value="author_qa">Author Q&A</option>
+            <option value="book_discussion">Book Discussion</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="live_description" rows="2"></textarea></div>
+        <div class="row">
+          <div class="col-6 mb-2"><label class="form-label">Scheduled At</label><input type="datetime-local" class="form-control" id="live_scheduled_at"></div>
+          <div class="col-6 mb-2"><label class="form-label">Duration (min)</label><input type="number" class="form-control" id="live_duration" value="60"></div>
+        </div>
+        <button class="btn btn-rc" id="live-submit-btn" onclick="saveLiveSession()">Schedule Session</button>
+        <button class="btn btn-outline-secondary d-none" id="live-cancel-btn" onclick="cancelLiveEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>Upcoming & Past Sessions</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Title</th><th>Type</th><th>When</th><th>RSVPs</th><th></th></tr></thead>
+            <tbody id="live-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RESOURCES ============ -->
+    <div class="tab-pane fade" id="tab-resources">
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="resource-form-title">Add a Reading Resource</h6>
+        <div id="resource-alert"></div>
+        <div class="mb-2"><label class="form-label">Type</label>
+          <select class="form-select" id="res_type">
+            <option value="study_guide">Study Guide</option>
+            <option value="author_bio">Author Bio</option>
+            <option value="glossary">Glossary</option>
+            <option value="article">Article</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="res_title"></div>
+        <div class="mb-2"><label class="form-label">Related Book (optional)</label><select class="form-select" id="res_book_id"><option value="">— None —</option></select></div>
+        <div class="mb-2"><label class="form-label">Content</label><textarea class="form-control" id="res_content" rows="3"></textarea></div>
+        <button class="btn btn-rc" id="resource-submit-btn" onclick="saveResource()">Add Resource</button>
+        <button class="btn btn-outline-secondary d-none" id="resource-cancel-btn" onclick="cancelResourceEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>Existing Resources</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>Title</th><th>Type</th><th>Book</th><th></th></tr></thead>
+            <tbody id="resources-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ OPPORTUNITIES ============ -->
+    <div class="tab-pane fade" id="tab-opportunities">
+      <div class="card card-rc p-3 mb-3" style="max-width:600px;">
+        <h6 id="opp-form-title">Post an Opportunity</h6>
+        <div id="opp-alert"></div>
+        <div class="mb-2"><label class="form-label">Type</label>
+          <select class="form-select" id="opp_type">
+            <option value="scholarship">Scholarship</option>
+            <option value="internship">Internship</option>
+            <option value="essay_contest">Essay Contest</option>
+            <option value="writing_competition">Writing Competition</option>
+            <option value="job">Job</option>
+          </select>
+        </div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="opp_title"></div>
+        <div class="mb-2"><label class="form-label">Organization <small class="text-muted">(optional — shown under the title)</small></label><input class="form-control" id="opp_organization" placeholder="e.g. MTN Foundation"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="opp_description" rows="2"></textarea></div>
+        <div class="mb-2"><label class="form-label">Application URL <small class="text-muted">(where members apply)</small></label><input class="form-control" id="opp_url" placeholder="https://..."></div>
+        <div class="mb-2"><label class="form-label">Deadline</label><input type="date" class="form-control" id="opp_deadline"></div>
+        <div class="mb-2"><label class="form-label">Logo / Cover Image <small class="text-muted">(optional — shown on the opportunity card)</small></label><input type="file" class="form-control" id="opp_logo" accept="image/*"></div>
+        <button class="btn btn-rc" id="opp-submit-btn" onclick="saveOpportunity()">Post Opportunity</button>
+        <button class="btn btn-outline-secondary d-none" id="opp-cancel-btn" onclick="cancelOppEdit()">Cancel Edit</button>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>Existing Opportunities</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th></th><th>Title</th><th>Type</th><th>Deadline</th><th>Applies to site</th><th></th></tr></thead>
+            <tbody id="opportunities-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ REVIEWS ============ -->
+    <div class="tab-pane fade" id="tab-reviews">
+      <h6>All Book Reviews</h6>
+      <div class="table-responsive">
+        <table class="table bg-white mini-table">
+          <thead><tr><th>Book</th><th>Reviewer</th><th>Rating</th><th>Review</th><th></th></tr></thead>
+          <tbody id="reviews-table">Loading...</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ DISCUSSIONS ============ -->
+    <div class="tab-pane fade" id="tab-discussions">
+      <h6>All Community Discussions</h6>
+      <div class="table-responsive">
+        <table class="table bg-white mini-table">
+          <thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Replies</th><th>Status</th><th></th></tr></thead>
+          <tbody id="discussions-table">Loading...</tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ CERTIFICATES ============ -->
+    <div class="tab-pane fade" id="tab-certificates">
+      <div class="card card-rc p-3 mb-3" style="max-width:500px;">
+        <h6>Manually Issue a Certificate</h6>
+        <div id="issue-cert-alert"></div>
+        <div class="mb-2"><label class="form-label">User ID</label><input type="number" class="form-control" id="issue_user_id"></div>
+        <div class="mb-2"><label class="form-label">Certificate Type</label><input class="form-control" id="issue_cert_type" placeholder="e.g. discussion, special_recognition"></div>
+        <div class="mb-2"><label class="form-label">Title</label><input class="form-control" id="issue_cert_title"></div>
+        <button class="btn btn-rc" onclick="issueCertificate()">Issue Certificate</button>
+      </div>
+      <div class="card card-rc p-3 mb-3" style="max-width:500px;">
+        <h6>Revoke / Reinstate a Certificate</h6>
+        <div class="input-group mb-2">
+          <input type="number" class="form-control" id="cert-id-input" placeholder="Certificate ID">
+          <button class="btn btn-outline-danger" onclick="revokeCertificate()">Revoke</button>
+          <button class="btn btn-outline-secondary" onclick="reinstateCertificate()">Reinstate</button>
+        </div>
+        <div id="cert-action-alert"></div>
+      </div>
+      <div class="card card-rc p-3">
+        <h6>All Issued Certificates</h6>
+        <div class="table-responsive">
+          <table class="table bg-white mini-table">
+            <thead><tr><th>ID</th><th>Member</th><th>Type</th><th>Title</th><th>Issued</th><th>Status</th></tr></thead>
+            <tbody id="certificates-table">Loading...</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ BROADCAST ============ -->
+    <div class="tab-pane fade" id="tab-broadcast">
+      <div class="card card-rc p-3" style="max-width:600px;">
+        <h6>Send Announcement to All Members</h6>
+        <div id="broadcast-alert"></div>
+        <textarea class="form-control mb-2" id="broadcast-message" rows="3" placeholder="Your announcement..."></textarea>
+        <button class="btn btn-rc" onclick="sendBroadcast()">Send to Everyone</button>
+      </div>
+    </div>
+
+    <!-- ============ REPORTS ============ -->
+    <div class="tab-pane fade" id="tab-reports">
+      <div class="sub-nav mb-2">
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadReports('pending')">Pending</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadReports('all')">All</button>
+      </div>
+      <div id="reports-list">Loading...</div>
+    </div>
+
+    <!-- ============ DONATIONS ============ -->
+    <div class="tab-pane fade" id="tab-donations">
+      <p class="text-muted small">Voluntary, self-reported acknowledgments from supporters. The app never processes
+        payment card data — these are just courtesy notes to reconcile against the Opay account statement and say thank you.</p>
+      <div id="donations-list">Loading...</div>
+    </div>
+
+    <!-- ============ BULK IMPORT ============ -->
+    <div class="tab-pane fade" id="tab-import">
+      <div class="card card-rc p-3" style="max-width:700px;">
+        <h6>Bulk Import Books via CSV</h6>
+        <p class="text-muted small">Columns: title, author, category, publisher, description, number_of_pages, publication_year. For full book text and file uploads (PDF/EPUB/DOCX/TXT), use the Books tab instead — this is for metadata-only bulk imports.</p>
+        <div id="import-alert"></div>
+        <textarea class="form-control mb-2" id="import-csv" rows="6" placeholder="title,author,category,publisher,description,number_of_pages,publication_year"></textarea>
+        <button class="btn btn-rc" style="width:fit-content;" onclick="submitBulkImport()">Import</button>
+      </div>
+    </div>
+
+    <!-- ============ AUDIT LOG ============ -->
+    <div class="tab-pane fade" id="tab-audit">
+      <h6>Audit Log</h6>
+      <div class="table-responsive">
+        <table class="table bg-white mini-table">
+          <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+          <tbody id="audit-table">Loading...</tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script src="js/admin.js?v=1785495775"></script>
+<script>
+requireAuth();
+requireRole("admin", "moderator");
+renderNav("admin");
+initAdminDashboard();
+</script>
+</body>
+</html>

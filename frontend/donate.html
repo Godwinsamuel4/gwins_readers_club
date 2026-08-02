@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Support the Club — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<nav class="navbar navbar-rc">
+  <div class="container">
+    <a class="navbar-brand" href="index.html"><img src="img/logo.png" alt="Gwin's Readers Club" class="navbar-logo-img">Gwin's Readers Club</a>
+  </div>
+</nav>
+
+<div class="container py-5" style="max-width: 720px;">
+  <div class="text-center mb-4">
+    <h3 class="fw-bold">Support Gwin's Readers Club</h3>
+    <p class="text-muted">Your gift helps keep the library, mentorship, and community programs free for every young reader.</p>
+  </div>
+
+  <div class="alert alert-warning small">
+    <strong>A note on who this is for:</strong> donations are voluntary contributions from parents, guardians, and
+    supporters of the club — never something we ask our student members to give. If you're a student reading this,
+    please don't send money yourself; talk to a parent or guardian first.
+  </div>
+
+  <div class="card donation-card p-4 mb-4">
+    <h6 class="mb-3">Bank Transfer Details</h6>
+    <div id="details-box">
+      <div class="d-flex justify-content-between border-bottom py-2">
+        <span class="text-muted">Provider</span><strong id="d-provider">—</strong>
+      </div>
+      <div class="d-flex justify-content-between border-bottom py-2">
+        <span class="text-muted">Account Name</span><strong id="d-name">—</strong>
+      </div>
+      <div class="d-flex justify-content-between py-2">
+        <span class="text-muted">Account Number</span>
+        <span><strong id="d-number">—</strong> <button class="btn btn-sm btn-outline-secondary ms-2" onclick="copyAccountNumber()">Copy</button></span>
+      </div>
+    </div>
+    <p class="text-muted small mt-3 mb-0">
+      We don't process card payments or store any payment details inside the app — send your transfer directly
+      through your own bank or Opay app using the details above.
+    </p>
+  </div>
+
+  <div class="card card-rc p-4 mb-4">
+    <h6 class="mb-2">Let us know you've sent a gift (optional)</h6>
+    <p class="text-muted small">This isn't required, and it never asks for your card or account details — just a
+      courtesy note so we can say thank you.</p>
+    <div id="ack-alert"></div>
+    <div class="row">
+      <div class="col-md-6 mb-2"><label class="form-label small">Your Name</label><input class="form-control" id="donor_name"></div>
+      <div class="col-md-6 mb-2"><label class="form-label small">Email (optional)</label><input type="email" class="form-control" id="donor_email"></div>
+    </div>
+    <div class="mb-2"><label class="form-label small">Approximate Amount (₦, optional)</label><input type="number" min="0" class="form-control" id="amount_naira"></div>
+    <div class="mb-3"><label class="form-label small">Note (optional)</label><textarea class="form-control" id="note" rows="2"></textarea></div>
+    <button class="btn btn-rc" style="width:fit-content;" onclick="submitAck()">Send Thank-You Note</button>
+  </div>
+
+  <p class="text-center text-muted small">
+    Have a safety question about donations or the platform? Visit our <a href="safety.html">Safety Center</a>.
+  </p>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+async function loadDetails() {
+  try {
+    const d = await fetch("/api/donations/details").then(r => r.json());
+    document.getElementById("d-provider").textContent = d.provider;
+    document.getElementById("d-name").textContent = d.account_name;
+    document.getElementById("d-number").textContent = d.account_number;
+  } catch (e) { /* static fallback already shown */ }
+}
+
+function copyAccountNumber() {
+  const num = document.getElementById("d-number").textContent;
+  navigator.clipboard.writeText(num).then(() => {
+    showAlert("ack-alert", "Account number copied.", "success");
+  }).catch(() => {});
+}
+
+async function submitAck() {
+  const payload = {
+    donor_name: document.getElementById("donor_name").value.trim() || null,
+    donor_email: document.getElementById("donor_email").value.trim() || null,
+    amount_naira: document.getElementById("amount_naira").value ? parseInt(document.getElementById("amount_naira").value, 10) : null,
+    note: document.getElementById("note").value.trim() || null,
+  };
+  try {
+    const res = await fetch("/api/donations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Something went wrong. Please try again.");
+    showAlert("ack-alert", "Thank you so much for supporting the club! 💛", "success");
+    document.getElementById("donor_name").value = "";
+    document.getElementById("donor_email").value = "";
+    document.getElementById("amount_naira").value = "";
+    document.getElementById("note").value = "";
+  } catch (err) {
+    showAlert("ack-alert", err.message);
+  }
+}
+
+loadDetails();
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>My Shelves — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>📚 My Shelves</h3>
+    <button class="btn btn-rc btn-sm" data-bs-toggle="modal" data-bs-target="#shelfModal">+ New Shelf</button>
+  </div>
+  <p class="text-muted small">Organize books into your own custom collections — beyond just Favorites.</p>
+
+  <div id="shelves-list">Loading...</div>
+</div>
+
+<div class="modal fade" id="shelfModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Create a Shelf</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-2"><label class="form-label">Name</label><input class="form-control" id="s_name" placeholder="e.g. 2026 Goals, To-Read, Book Club Picks"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="s_description" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="createShelf()">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="addBookModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Add a Book to This Shelf</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <select class="form-select" id="add-book-select"></select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="confirmAddBook()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("shelves");
+let activeShelfId = null;
+let allBooks = [];
+
+async function loadAllBooks() {
+  allBooks = await api("/library/books?sort=title");
+  document.getElementById("add-book-select").innerHTML = allBooks.map(b => `<option value="${b.id}">${b.title} — ${b.author}</option>`).join("");
+}
+
+async function loadShelves() {
+  const shelves = await api("/shelves");
+  const el = document.getElementById("shelves-list");
+  if (!shelves.length) { el.innerHTML = `<p class="text-muted">No shelves yet — create your first one above.</p>`; return; }
+  el.innerHTML = "";
+  for (const shelf of shelves) {
+    const books = await api(`/shelves/${shelf.id}/books`);
+    const card = document.createElement("div");
+    card.className = "card card-rc p-3 mb-3";
+    card.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <h5>${escapeHtml(shelf.name)}</h5>
+          <div class="text-muted small">${escapeHtml(shelf.description || "")} · ${shelf.book_count} book(s)</div>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline-secondary shelf-rename-btn" data-id="${shelf.id}">Rename</button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="openAddBook(${shelf.id})">+ Add Book</button>
+          <button class="btn btn-sm btn-link text-danger" onclick="deleteShelf(${shelf.id})">Delete</button>
+        </div>
+      </div>
+      <div class="row g-2 mt-2">
+        ${books.map((b, i) => `
+          <div class="col-6 col-md-2">
+            <a href="book.html?id=${b.id}" class="text-decoration-none text-dark">
+              ${bookCoverHtml(b, "height:100px; font-size:0.65rem;")}
+            </a>
+            <div class="d-flex justify-content-between">
+              <button class="btn btn-sm btn-link p-0" style="font-size:0.7rem;" ${i === 0 ? "disabled" : ""} onclick="moveBook(${shelf.id}, ${b.id}, -1)">◀</button>
+              <button class="btn btn-sm btn-link text-danger p-0" onclick="removeBook(${shelf.id}, ${b.id})">Remove</button>
+              <button class="btn btn-sm btn-link p-0" style="font-size:0.7rem;" ${i === books.length - 1 ? "disabled" : ""} onclick="moveBook(${shelf.id}, ${b.id}, 1)">▶</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+    card.querySelector(".shelf-rename-btn").addEventListener("click", () => {
+      renameShelf(shelf.id, shelf.name, shelf.description || "");
+    });
+    el.appendChild(card);
+  }
+}
+
+async function renameShelf(id, currentName, currentDescription) {
+  const name = prompt("Shelf name:", currentName);
+  if (name === null) return;
+  const description = prompt("Description:", currentDescription);
+  if (description === null) return;
+  await api(`/shelves/${id}`, { method: "PUT", body: JSON.stringify({ name, description }) });
+  loadShelves();
+}
+
+async function moveBook(shelfId, bookId, direction) {
+  const books = await api(`/shelves/${shelfId}/books`);
+  const ids = books.map(b => b.id);
+  const idx = ids.indexOf(bookId);
+  const swapWith = idx + direction;
+  if (swapWith < 0 || swapWith >= ids.length) return;
+  [ids[idx], ids[swapWith]] = [ids[swapWith], ids[idx]];
+  await api(`/shelves/${shelfId}/reorder`, { method: "PUT", body: JSON.stringify({ book_ids_in_order: ids }) });
+  loadShelves();
+}
+
+async function createShelf() {
+  const payload = {
+    name: document.getElementById("s_name").value,
+    description: document.getElementById("s_description").value,
+  };
+  await api("/shelves", { method: "POST", body: JSON.stringify(payload) });
+  bootstrap.Modal.getInstance(document.getElementById("shelfModal")).hide();
+  loadShelves();
+}
+
+async function deleteShelf(id) {
+  if (!confirm("Delete this shelf? This won't delete the books, just the shelf.")) return;
+  await api(`/shelves/${id}`, { method: "DELETE" });
+  loadShelves();
+}
+
+function openAddBook(shelfId) {
+  activeShelfId = shelfId;
+  new bootstrap.Modal(document.getElementById("addBookModal")).show();
+}
+
+async function confirmAddBook() {
+  const bookId = document.getElementById("add-book-select").value;
+  await api(`/shelves/${activeShelfId}/books/${bookId}`, { method: "POST" });
+  bootstrap.Modal.getInstance(document.getElementById("addBookModal")).hide();
+  loadShelves();
+}
+
+async function removeBook(shelfId, bookId) {
+  await api(`/shelves/${shelfId}/books/${bookId}`, { method: "DELETE" });
+  loadShelves();
+}
+
+loadAllBooks();
+loadShelves();
+</script>
+</body>
+</html>

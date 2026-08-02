@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Upload a Book — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+<style>
+  .upload-steps { display:flex; gap:8px; margin-bottom:1.5rem; }
+  .upload-step {
+    flex:1; text-align:center; padding:10px 6px; border-radius:10px;
+    background:#f2effa; color:#8a7fae; font-size:0.85rem; font-weight:600;
+    position:relative;
+  }
+  .upload-step.active { background: var(--rc-purple, #35538F); color:#fff; }
+  .upload-step.done { background:#e3d9f7; color:var(--rc-purple, #35538F); }
+  .upload-dropzone {
+    border:2px dashed #c7bfe0; border-radius:14px; padding:2.5rem 1.5rem;
+    text-align:center; cursor:pointer; transition:background 0.15s ease, border-color 0.15s ease;
+  }
+  .upload-dropzone:hover, .upload-dropzone.dragover { background:#f7f4fc; border-color: var(--rc-purple, #35538F); }
+  .upload-dropzone.has-file { border-style:solid; border-color:#3F7856; background:#f2f9f5; }
+  .submission-row { border-left:4px solid #ccc; }
+  .submission-row.status-pending { border-left-color:#c9a04a; }
+  .submission-row.status-approved { border-left-color:#3F7856; }
+  .submission-row.status-rejected { border-left-color:#c0392b; }
+  .status-badge { font-size:0.72rem; padding:2px 9px; border-radius:20px; font-weight:600; text-transform:uppercase; letter-spacing:0.02em; }
+  .status-badge.status-pending { background:#fbeecb; color:#8a6d1d; }
+  .status-badge.status-approved { background:#dcf0e4; color:#1f5a3d; }
+  .status-badge.status-rejected { background:#fadedb; color:#a5321f; }
+</style>
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4" style="max-width:760px;">
+  <h3 class="mb-1">📤 Upload a Book</h3>
+  <p class="text-muted mb-4">Share a book with the community. Every submission is reviewed by a moderator before it appears in the library.</p>
+
+  <div class="upload-steps">
+    <div class="upload-step" id="step-indicator-1">1. Choose file</div>
+    <div class="upload-step" id="step-indicator-2">2. Book details</div>
+    <div class="upload-step" id="step-indicator-3">3. Review & submit</div>
+  </div>
+
+  <div id="upload-alert"></div>
+
+  <!-- Step 1: file -->
+  <div class="card card-rc p-4" id="step-1">
+    <div class="upload-dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+      <div style="font-size:2.2rem;">📄</div>
+      <div class="fw-semibold mt-2" id="dropzone-label">Drag a file here, or click to choose one</div>
+      <div class="small text-muted mt-1">Supported formats: .txt, .pdf, .docx, .epub — up to 25MB</div>
+      <input type="file" id="file-input" accept=".txt,.pdf,.docx,.epub" class="d-none" onchange="onFileChosen(this.files[0])">
+    </div>
+    <div class="d-flex justify-content-end mt-3">
+      <button class="btn btn-rc" id="step1-next-btn" disabled onclick="goToStep(2)">Next: Book details →</button>
+    </div>
+  </div>
+
+  <!-- Step 2: metadata -->
+  <div class="card card-rc p-4 d-none" id="step-2">
+    <div class="row g-2">
+      <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="u_title" required></div>
+      <div class="col-md-6"><label class="form-label">Author</label><input class="form-control" id="u_author" required></div>
+      <div class="col-md-6">
+        <label class="form-label">Category</label>
+        <select class="form-select" id="u_category" required></select>
+      </div>
+      <div class="col-md-6"><label class="form-label">Publisher <small class="text-muted">(optional)</small></label><input class="form-control" id="u_publisher"></div>
+      <div class="col-md-4"><label class="form-label">Language</label><input class="form-control" id="u_language" value="English"></div>
+      <div class="col-md-4"><label class="form-label">Publication Year <small class="text-muted">(optional)</small></label><input type="number" class="form-control" id="u_year"></div>
+      <div class="col-md-4"><label class="form-label">Cover Color</label><input type="color" class="form-control form-control-color" id="u_cover_color" value="#35538F"></div>
+      <div class="col-12"><label class="form-label">Description <small class="text-muted">(optional)</small></label><textarea class="form-control" id="u_description" rows="3" placeholder="A sentence or two about what this book covers..."></textarea></div>
+      <div class="col-12">
+        <label class="form-label">Cover Image <small class="text-muted">(optional — jpg/png/webp)</small></label>
+        <input type="file" class="form-control" id="u_cover_image" accept="image/*">
+      </div>
+    </div>
+    <div class="d-flex justify-content-between mt-3">
+      <button class="btn btn-outline-secondary" onclick="goToStep(1)">← Back</button>
+      <button class="btn btn-rc" onclick="validateAndReview()">Next: Review →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: review -->
+  <div class="card card-rc p-4 d-none" id="step-3">
+    <h6 class="mb-3">Review your submission</h6>
+    <div id="review-summary" class="mb-3"></div>
+    <div class="alert alert-light border small">
+      Once submitted, a moderator will review this book before it appears in the public library.
+      You can track its status below under <strong>My Submissions</strong>.
+    </div>
+    <div class="d-flex justify-content-between mt-2">
+      <button class="btn btn-outline-secondary" onclick="goToStep(2)">← Back</button>
+      <button class="btn btn-rc" id="submit-btn" onclick="submitBook()">📤 Submit for Review</button>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div class="card card-rc p-4 d-none text-center" id="step-success">
+    <div style="font-size:2.4rem;">🎉</div>
+    <h5 class="mt-2">Submitted!</h5>
+    <p class="text-muted">Your book is now pending review. We'll notify you once a moderator responds.</p>
+    <div class="d-flex justify-content-center gap-2 mt-2">
+      <button class="btn btn-rc" onclick="resetWizard()">Upload another book</button>
+      <a href="library.html" class="btn btn-outline-secondary">Back to Library</a>
+    </div>
+  </div>
+
+  <hr class="my-4">
+
+  <h5 class="mb-3">📋 My Submissions</h5>
+  <div id="my-submissions">Loading...</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("upload");
+
+let chosenFile = null;
+let currentStep = 1;
+
+function goToStep(n) {
+  currentStep = n;
+  [1, 2, 3].forEach(i => {
+    document.getElementById(`step-${i}`).classList.toggle("d-none", i !== n);
+    const ind = document.getElementById(`step-indicator-${i}`);
+    ind.classList.toggle("active", i === n);
+    ind.classList.toggle("done", i < n);
+  });
+}
+
+function onFileChosen(file) {
+  if (!file) return;
+  const ext = file.name.split(".").pop().toLowerCase();
+  if (!["txt", "pdf", "docx", "epub"].includes(ext)) {
+    showAlert("upload-alert", "Unsupported file type. Please choose a .txt, .pdf, .docx, or .epub file.");
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    showAlert("upload-alert", "That file is larger than the 25MB limit.");
+    return;
+  }
+  chosenFile = file;
+  document.getElementById("dropzone").classList.add("has-file");
+  document.getElementById("dropzone-label").textContent = `✅ ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+  document.getElementById("step1-next-btn").disabled = false;
+
+  // Best-effort guess at a title from the filename, to save typing — the
+  // member can still freely edit it in step 2.
+  if (!document.getElementById("u_title").value) {
+    const guess = file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
+    document.getElementById("u_title").value = guess.replace(/\b\w/g, c => c.toUpperCase());
+  }
+}
+
+const dropzone = document.getElementById("dropzone");
+["dragenter", "dragover"].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); })
+);
+["dragleave", "drop"].forEach(evt =>
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); })
+);
+dropzone.addEventListener("drop", (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) onFileChosen(file);
+});
+
+async function loadCategories() {
+  const cats = await api("/library/categories");
+  document.getElementById("u_category").innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join("");
+}
+
+function validateAndReview() {
+  const title = document.getElementById("u_title").value.trim();
+  const author = document.getElementById("u_author").value.trim();
+  const category = document.getElementById("u_category").value;
+  if (!title || !author || !category) {
+    showAlert("upload-alert", "Title, author, and category are required.");
+    return;
+  }
+  const coverFile = document.getElementById("u_cover_image").files[0];
+  const description = document.getElementById("u_description").value.trim();
+  const publisher = document.getElementById("u_publisher").value.trim();
+  const year = document.getElementById("u_year").value;
+
+  document.getElementById("review-summary").innerHTML = `
+    <div class="d-flex gap-3">
+      ${coverFile
+        ? `<img src="${URL.createObjectURL(coverFile)}" alt="Cover preview" class="book-cover-photo" style="width:70px; min-width:70px; height:96px;">`
+        : `<div class="book-cover" style="background:${document.getElementById("u_cover_color").value}; width:70px; min-width:70px; height:96px; font-size:0.65rem;">${escapeHtml(title)}</div>`}
+      <div>
+        <div class="fw-bold">${escapeHtml(title)}</div>
+        <div class="text-muted small">by ${escapeHtml(author)}</div>
+        <div class="category-pill mt-1">${escapeHtml(category)}</div>
+        ${publisher ? `<div class="small mt-1">Publisher: ${escapeHtml(publisher)}</div>` : ""}
+        ${year ? `<div class="small">Year: ${escapeHtml(year)}</div>` : ""}
+        <div class="small mt-1">File: 📄 ${escapeHtml(chosenFile.name)}</div>
+        ${coverFile ? `<div class="small">Cover image: 🖼️ ${escapeHtml(coverFile.name)}</div>` : ""}
+        ${description ? `<div class="small text-muted mt-1">"${escapeHtml(description)}"</div>` : ""}
+      </div>
+    </div>
+  `;
+  goToStep(3);
+}
+
+async function submitBook() {
+  const btn = document.getElementById("submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Submitting...";
+  try {
+    const fd = new FormData();
+    fd.append("title", document.getElementById("u_title").value.trim());
+    fd.append("author", document.getElementById("u_author").value.trim());
+    fd.append("category", document.getElementById("u_category").value);
+    fd.append("publisher", document.getElementById("u_publisher").value.trim());
+    fd.append("language", document.getElementById("u_language").value || "English");
+    fd.append("cover_color", document.getElementById("u_cover_color").value);
+    fd.append("description", document.getElementById("u_description").value.trim());
+    const year = document.getElementById("u_year").value;
+    if (year) fd.append("publication_year", year);
+    fd.append("book_file", chosenFile);
+    const coverFile = document.getElementById("u_cover_image").files[0];
+    if (coverFile) fd.append("cover_image", coverFile);
+
+    await apiUpload("/library/books/submit", fd);
+
+    [1, 2, 3].forEach(i => document.getElementById(`step-${i}`).classList.add("d-none"));
+    document.getElementById("step-success").classList.remove("d-none");
+    loadMySubmissions();
+  } catch (err) {
+    showAlert("upload-alert", err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "📤 Submit for Review";
+  }
+}
+
+function resetWizard() {
+  chosenFile = null;
+  document.getElementById("file-input").value = "";
+  document.getElementById("dropzone").classList.remove("has-file");
+  document.getElementById("dropzone-label").textContent = "Drag a file here, or click to choose one";
+  document.getElementById("step1-next-btn").disabled = true;
+  ["u_title", "u_author", "u_publisher", "u_year", "u_description"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("u_language").value = "English";
+  document.getElementById("u_cover_color").value = "#35538F";
+  document.getElementById("u_cover_image").value = "";
+  document.getElementById("step-success").classList.add("d-none");
+  document.getElementById("upload-alert").innerHTML = "";
+  goToStep(1);
+}
+
+async function loadMySubmissions() {
+  const el = document.getElementById("my-submissions");
+  try {
+    const books = await api("/library/books/mine");
+    if (!books.length) {
+      el.innerHTML = `<p class="text-muted">You haven't submitted any books yet.</p>`;
+      return;
+    }
+    el.innerHTML = books.map(b => `
+      <div class="card card-rc submission-row status-${b.status} p-3 mb-2">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <div class="fw-bold">${escapeHtml(b.title)} <span class="text-muted fw-normal">by ${escapeHtml(b.author)}</span></div>
+            <div class="small text-muted">${escapeHtml(b.category)} · submitted ${timeAgo(b.created_at)}</div>
+            ${b.status === "rejected" && b.rejection_reason ? `<div class="small text-danger mt-1">Reason: ${escapeHtml(b.rejection_reason)}</div>` : ""}
+          </div>
+          <div class="text-end">
+            <span class="status-badge status-${b.status}">${b.status}</span>
+            ${b.status === "approved" ? `<div class="mt-2"><a href="book.html?id=${b.id}" class="btn btn-sm btn-rc">View in Library</a></div>` : ""}
+          </div>
+        </div>
+      </div>
+    `).join("");
+  } catch (err) {
+    el.innerHTML = `<p class="text-muted">Couldn't load your submissions right now.</p>`;
+  }
+}
+
+loadCategories();
+loadMySubmissions();
+</script>
+</body>
+</html>

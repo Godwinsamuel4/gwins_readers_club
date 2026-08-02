@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discussion — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4" style="max-width: 760px;">
+  <a href="community.html" class="small">&larr; Back to Community</a>
+  <div id="post-detail" class="mt-3">Loading...</div>
+
+  <div class="card card-rc p-3 mt-3">
+    <h6>Replies</h6>
+    <div id="replies-list">Loading...</div>
+    <form id="reply-form" class="mt-3">
+      <textarea class="form-control mb-2" id="reply-content" rows="2" placeholder="Write a reply..."></textarea>
+      <button type="submit" class="btn btn-rc btn-sm">Reply</button>
+    </form>
+  </div>
+</div>
+
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("community");
+const params = new URLSearchParams(window.location.search);
+const postId = params.get("id");
+const user = getUser();
+
+async function loadPost() {
+  const p = await api(`/community/discussions/${postId}`);
+  const isStaff = user.role === "admin" || user.role === "moderator";
+  document.getElementById("post-detail").innerHTML = `
+    <div class="card card-rc p-3">
+      <div class="d-flex justify-content-between">
+        <div>
+          ${p.is_pinned ? '<span class="badge bg-warning text-dark me-1">📌 Pinned</span>' : ""}
+          <span class="category-pill">${p.category}</span>
+        </div>
+        ${isStaff ? `
+          <div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="pinPost()">${p.is_pinned ? "Unpin" : "Pin"}</button>
+            <button class="btn btn-sm btn-outline-danger" onclick="removePost()">Remove</button>
+          </div>` : ""}
+      </div>
+      <h4 class="mt-2">${escapeHtml(p.title)}</h4>
+      <p>${escapeHtml(p.content)}</p>
+      <div class="d-flex justify-content-between">
+        <div class="text-muted small">by ${escapeHtml(p.author_name)} · ${timeAgo(p.created_at)}</div>
+        <button class="btn btn-sm btn-link text-muted p-0" onclick="reportContent('discussion_post', ${p.id})">Report</button>
+      </div>
+    </div>
+  `;
+}
+
+async function reportContent(contentType, contentId) {
+  const reason = prompt("Why are you reporting this content?");
+  if (!reason) return;
+  try {
+    await api("/reports", { method: "POST", body: JSON.stringify({ content_type: contentType, content_id: contentId, reason }) });
+    alert("Thanks — this has been flagged for moderator review.");
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+let allReplies = [];
+
+async function loadReplies() {
+  allReplies = await api(`/community/discussions/${postId}/replies`);
+  const el = document.getElementById("replies-list");
+  if (!allReplies.length) { el.innerHTML = `<p class="text-muted small">No replies yet.</p>`; return; }
+  const topLevel = allReplies.filter(r => !r.parent_reply_id);
+  el.innerHTML = topLevel.map(r => renderReply(r)).join("");
+}
+
+function renderReply(r, depth = 0) {
+  const isStaff = user.role === "admin" || user.role === "moderator";
+  const isMine = r.user_id === user.id;
+  const children = allReplies.filter(c => c.parent_reply_id === r.id);
+  return `
+    <div class="border-bottom py-2" style="margin-left:${depth * 24}px;">
+      <div class="d-flex justify-content-between">
+        <div class="flex-grow-1">
+          <strong class="small">${escapeHtml(r.author_name)}</strong>
+          <span class="text-muted small ms-1">${timeAgo(r.created_at)}${r.is_edited ? " (edited)" : ""}</span>
+          <p class="mb-0 small" id="reply-text-${r.id}">${escapeHtml(r.content)}</p>
+          <div class="mt-1">
+            <button class="btn btn-sm btn-link p-0 me-2 small" onclick="showReplyBox(${r.id})">Reply</button>
+            ${isMine ? `<button class="btn btn-sm btn-link p-0 me-2 small" onclick="startEditReply(${r.id})">Edit</button>` : ""}
+          </div>
+          <div id="reply-box-${r.id}" class="d-none mt-2">
+            <textarea class="form-control form-control-sm mb-1" id="reply-box-text-${r.id}" rows="2" placeholder="Write a reply..."></textarea>
+            <button class="btn btn-rc btn-sm" onclick="submitNestedReply(${r.id})">Post</button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="showReplyBox(${r.id})">Cancel</button>
+          </div>
+        </div>
+        ${isStaff ? `<button class="btn btn-sm btn-link text-danger" onclick="removeReply(${r.id})">✕</button>` : `<button class="btn btn-sm btn-link text-muted" onclick="reportContent('discussion_reply', ${r.id})">Report</button>`}
+      </div>
+      ${children.map(c => renderReply(c, depth + 1)).join("")}
+    </div>
+  `;
+}
+
+function showReplyBox(id) {
+  document.getElementById(`reply-box-${id}`).classList.toggle("d-none");
+}
+
+async function submitNestedReply(parentId) {
+  const box = document.getElementById(`reply-box-text-${parentId}`);
+  const content = box.value.trim();
+  if (!content) return;
+  await api(`/community/discussions/${postId}/replies`, {
+    method: "POST", body: JSON.stringify({ content, parent_reply_id: parentId }),
+  });
+  loadReplies();
+}
+
+function startEditReply(id) {
+  const reply = allReplies.find(r => r.id === id);
+  const el = document.getElementById(`reply-text-${id}`);
+  el.innerHTML = `
+    <textarea class="form-control form-control-sm mb-1" id="edit-reply-${id}">${escapeHtml(reply.content)}</textarea>
+    <button class="btn btn-rc btn-sm" onclick="saveEditReply(${id})">Save</button>
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadReplies()">Cancel</button>
+  `;
+}
+
+async function saveEditReply(id) {
+  const content = document.getElementById(`edit-reply-${id}`).value.trim();
+  if (!content) return;
+  await api(`/community/replies/${id}`, { method: "PUT", body: JSON.stringify({ content }) });
+  loadReplies();
+}
+
+document.getElementById("reply-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const content = document.getElementById("reply-content").value.trim();
+  if (!content) return;
+  await api(`/community/discussions/${postId}/replies`, {
+    method: "POST", body: JSON.stringify({ content }),
+  });
+  document.getElementById("reply-content").value = "";
+  loadReplies();
+});
+
+async function pinPost() {
+  await api(`/community/discussions/${postId}/pin`, { method: "PUT" });
+  loadPost();
+}
+
+async function removePost() {
+  if (!confirm("Remove this discussion?")) return;
+  await api(`/community/discussions/${postId}`, { method: "DELETE" });
+  window.location.href = "community.html";
+}
+
+async function removeReply(id) {
+  if (!confirm("Remove this reply?")) return;
+  await api(`/community/replies/${id}`, { method: "DELETE" });
+  loadReplies();
+}
+
+loadPost();
+loadReplies();
+</script>
+</body>
+</html>

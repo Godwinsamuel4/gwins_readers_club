@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reading Clubs — Gwin's Readers Club</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<link href="css/style.css?v=1785495775" rel="stylesheet">
+<link rel="icon" type="image/png" href="img/logo-32.png">
+</head>
+<body>
+
+<div id="rc-nav"></div>
+
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>🏫 Campus Reading Clubs</h3>
+    <button class="btn btn-rc btn-sm" id="new-club-btn" style="display:none;" data-bs-toggle="modal" data-bs-target="#clubModal">+ Start a Club</button>
+  </div>
+
+  <div class="row g-2 mb-4">
+    <div class="col-md-4">
+      <input type="text" class="form-control" id="school-search" placeholder="Filter by school/organization...">
+    </div>
+    <div class="col-md-2"><button class="btn btn-rc w-100" onclick="loadClubs()">Filter</button></div>
+  </div>
+
+  <div class="row g-4" id="clubs-grid">Loading...</div>
+</div>
+
+<div class="modal fade" id="clubModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Start a Reading Club</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="club-alert"></div>
+        <div class="mb-2"><label class="form-label">Club Name</label><input class="form-control" id="c_name"></div>
+        <div class="mb-2"><label class="form-label">School / Organization</label><input class="form-control" id="c_school"></div>
+        <div class="mb-2"><label class="form-label">Description</label><textarea class="form-control" id="c_description" rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-rc" onclick="submitClub()">Create Club</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js?v=1785495775"></script>
+<script>
+requireAuth();
+renderNav("clubs");
+const user = getUser();
+if (["admin", "moderator", "mentor"].includes(user.role)) {
+  document.getElementById("new-club-btn").style.display = "inline-block";
+}
+
+async function loadClubs() {
+  const school = document.getElementById("school-search").value;
+  const params = new URLSearchParams();
+  if (school) params.append("school", school);
+  const clubs = await api(`/clubs?${params.toString()}`);
+  const grid = document.getElementById("clubs-grid");
+  if (!clubs.length) { grid.innerHTML = `<p class="text-muted">No reading clubs yet.</p>`; return; }
+  grid.innerHTML = clubs.map(c => `
+    <div class="col-md-4">
+      <div class="card card-rc h-100 p-3">
+        <h5>${escapeHtml(c.name)}</h5>
+        <div class="text-muted small mb-2">${escapeHtml(c.school_or_org || "Independent club")}</div>
+        <p class="small">${escapeHtml(c.description || "")}</p>
+        <div class="d-flex justify-content-between align-items-center mt-auto">
+          <span class="category-pill">${c.member_count} members</span>
+          <a href="club.html?id=${c.id}" class="btn btn-sm btn-outline-secondary">View</a>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function submitClub() {
+  const payload = {
+    name: document.getElementById("c_name").value,
+    school_or_org: document.getElementById("c_school").value,
+    description: document.getElementById("c_description").value,
+  };
+  try {
+    await api("/clubs", { method: "POST", body: JSON.stringify(payload) });
+    bootstrap.Modal.getInstance(document.getElementById("clubModal")).hide();
+    loadClubs();
+  } catch (err) {
+    showAlert("club-alert", err.message);
+  }
+}
+
+loadClubs();
+</script>
+</body>
+</html>
